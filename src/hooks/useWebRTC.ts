@@ -6,6 +6,7 @@ const ICE_SERVERS: RTCConfiguration = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:stun2.l.google.com:19302" },
   ],
 };
 
@@ -21,8 +22,17 @@ export function useWebRTC(roomId: string, userId: string) {
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const remoteAudioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
 
+  // Use ref for handleSignal to avoid stale closure in channel.subscribe
+  const handleSignalRef = useRef<(message: SignalMessage) => Promise<void>>(async () => {});
+
   const createPeerConnection = useCallback(
     (remoteUserId: string): RTCPeerConnection => {
+      // Close existing connection if any to avoid duplicates
+      const existing = peerConnectionsRef.current.get(remoteUserId);
+      if (existing) {
+        existing.close();
+      }
+
       const pc = new RTCPeerConnection(ICE_SERVERS);
 
       // Add local tracks to peer connection
@@ -30,16 +40,22 @@ export function useWebRTC(roomId: string, userId: string) {
         pc.addTrack(track, localStreamRef.current!);
       });
 
-      // Handle incoming remote audio
+      // Handle incoming remote audio — fix autoplay policy with explicit play()
       pc.ontrack = (event) => {
         const [remoteStream] = event.streams;
+        if (!remoteStream) return;
+
         let audioEl = remoteAudioRefs.current.get(remoteUserId);
         if (!audioEl) {
           audioEl = new Audio();
           audioEl.autoplay = true;
+          document.body.appendChild(audioEl); // must be in DOM for some browsers
           remoteAudioRefs.current.set(remoteUserId, audioEl);
         }
         audioEl.srcObject = remoteStream;
+        audioEl.play().catch(() => {
+          // Autoplay blocked — will play on next user interaction
+        });
       };
 
       // Send ICE candidates via Ably
@@ -55,6 +71,7 @@ export function useWebRTC(roomId: string, userId: string) {
       };
 
       pc.onconnectionstatechange = () => {
+        console.log(`[WebRTC] ${remoteUserId} state: ${pc.connectionState}`);
         if (pc.connectionState === "connected") {
           setParticipants((prev) => {
             const next = new Map(prev);
@@ -87,8 +104,10 @@ export function useWebRTC(roomId: string, userId: string) {
       // Ignore own messages
       if (from === userId) return;
 
+      console.log(`[Signal] received: ${type} from ${from}`);
+
       if (type === "user-joined") {
-        // Someone joined — initiate offer
+        // Someone joined — initiate offer (we are the existing user)
         const pc = createPeerConnection(from);
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
@@ -101,6 +120,7 @@ export function useWebRTC(roomId: string, userId: string) {
       }
 
       if (type === "offer") {
+        // We received an offer — create answer
         const pc = createPeerConnection(from);
         await pc.setRemoteDescription(new RTCSessionDescription(payload as RTCSessionDescriptionInit));
         const answer = await pc.createAnswer();
@@ -115,15 +135,19 @@ export function useWebRTC(roomId: string, userId: string) {
 
       if (type === "answer") {
         const pc = peerConnectionsRef.current.get(from);
-        if (pc) {
+        if (pc && pc.signalingState !== "stable") {
           await pc.setRemoteDescription(new RTCSessionDescription(payload as RTCSessionDescriptionInit));
         }
       }
 
       if (type === "ice-candidate") {
         const pc = peerConnectionsRef.current.get(from);
-        if (pc) {
-          await pc.addIceCandidate(new RTCIceCandidate(payload as RTCIceCandidateInit));
+        if (pc && pc.remoteDescription) {
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(payload as RTCIceCandidateInit));
+          } catch (e) {
+            console.warn("[ICE] Failed to add candidate", e);
+          }
         }
       }
 
@@ -131,7 +155,12 @@ export function useWebRTC(roomId: string, userId: string) {
         const pc = peerConnectionsRef.current.get(from);
         pc?.close();
         peerConnectionsRef.current.delete(from);
-        remoteAudioRefs.current.delete(from);
+        const audioEl = remoteAudioRefs.current.get(from);
+        if (audioEl) {
+          audioEl.srcObject = null;
+          audioEl.remove();
+          remoteAudioRefs.current.delete(from);
+        }
         setParticipants((prev) => {
           const next = new Map(prev);
           next.delete(from);
@@ -142,28 +171,42 @@ export function useWebRTC(roomId: string, userId: string) {
     [userId, createPeerConnection]
   );
 
+  // Keep handleSignalRef up to date so channel.subscribe always calls latest version
+  useEffect(() => {
+    handleSignalRef.current = handleSignal;
+  }, [handleSignal]);
+
   const joinRoom = useCallback(async () => {
     try {
       // Get microphone access
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
       localStreamRef.current = stream;
 
-      // Connect to Ably
-      const ably = new Ably.Realtime({ authUrl: "/api/ably-token" });
+      // Connect to Ably with clientId for token auth
+      const ably = new Ably.Realtime({
+        authUrl: `/api/ably-token?clientId=${userId}`,
+        clientId: userId,
+      });
       ablyRef.current = ably;
 
-      ably.connection.on("connected", () => setIsConnected(true));
+      ably.connection.on("connected", () => {
+        console.log("[Ably] Connected");
+        setIsConnected(true);
+      });
       ably.connection.on("disconnected", () => setIsConnected(false));
+      ably.connection.on("failed", (err) => {
+        setError(`Ably connection failed: ${err?.reason?.message ?? "unknown"}`);
+      });
 
       const channel = ably.channels.get(`voice-room:${roomId}`);
       channelRef.current = channel;
 
-      // Listen for signals
-      channel.subscribe("signal", (msg) => {
-        handleSignal(msg.data as SignalMessage);
+      // Subscribe first, then announce — avoids missing own signal
+      await channel.subscribe("signal", (msg) => {
+        handleSignalRef.current(msg.data as SignalMessage);
       });
 
-      // Announce presence
+      // Announce presence after subscribe is ready
       channel.publish("signal", {
         type: "user-joined",
         from: userId,
@@ -172,7 +215,7 @@ export function useWebRTC(roomId: string, userId: string) {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to join room");
     }
-  }, [roomId, userId, handleSignal]);
+  }, [roomId, userId]);
 
   const leaveRoom = useCallback(() => {
     channelRef.current?.publish("signal", {
@@ -189,6 +232,7 @@ export function useWebRTC(roomId: string, userId: string) {
 
     remoteAudioRefs.current.forEach((audio) => {
       audio.srcObject = null;
+      audio.remove();
     });
     remoteAudioRefs.current.clear();
 
