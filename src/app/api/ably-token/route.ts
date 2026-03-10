@@ -11,7 +11,13 @@ export async function GET(request: Request) {
   }
 
   const client = new Ably.Rest(apiKey);
-  const tokenRequest = await client.auth.createTokenRequest({ clientId });
+  const tokenRequest = await client.auth.createTokenRequest({
+    clientId,
+    capability: {
+      "voice-room:*": ["publish", "subscribe"],
+      "voice-room-presence:*": ["publish", "subscribe", "presence"],
+    },
+  });
 
   return NextResponse.json(tokenRequest);
 }
