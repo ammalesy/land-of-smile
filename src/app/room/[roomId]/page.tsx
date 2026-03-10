@@ -1,9 +1,8 @@
 "use client";
 
 import { VoiceRoom } from "@/components/VoiceRoom";
-import { use } from "react";
+import { use, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { useMemo } from "react";
 
 interface RoomPageProps {
   params: Promise<{ roomId: string }>;
@@ -11,7 +10,8 @@ interface RoomPageProps {
 
 export default function RoomPage({ params }: RoomPageProps) {
   const { roomId } = use(params);
-  const userId = useMemo(() => `user-${uuidv4().slice(0, 6)}`, []);
+  // useRef ensures userId never changes across re-renders
+  const userIdRef = useRef<string>(`user-${uuidv4().slice(0, 6)}`);
 
-  return <VoiceRoom roomId={roomId} userId={userId} />;
+  return <VoiceRoom roomId={roomId} userId={userIdRef.current} />;
 }

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import Ably from "ably";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const clientId = searchParams.get("clientId") ?? "anonymous";
@@ -14,10 +16,13 @@ export async function GET(request: Request) {
   const tokenRequest = await client.auth.createTokenRequest({
     clientId,
     capability: {
-      "voice-room:*": ["publish", "subscribe"],
-      "voice-room-presence:*": ["publish", "subscribe", "presence"],
+      "voice-room:*": ["publish", "subscribe", "presence"],
     },
   });
 
-  return NextResponse.json(tokenRequest);
+  return NextResponse.json(tokenRequest, {
+    headers: {
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+    },
+  });
 }

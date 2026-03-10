@@ -198,9 +198,11 @@ export function useWebRTC(roomId: string, userId: string) {
       localStreamRef.current = stream;
 
       // Connect to Ably with clientId for token auth
+      // Add random nonce to prevent browser caching the token request
       const ably = new Ably.Realtime({
-        authUrl: `/api/ably-token?clientId=${userId}`,
+        authUrl: `/api/ably-token?clientId=${userId}&t=${Date.now()}`,
         clientId: userId,
+        authMethod: "GET",
       });
       ablyRef.current = ably;
 
