@@ -197,12 +197,19 @@ export function useWebRTC(roomId: string, userId: string) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
       localStreamRef.current = stream;
 
-      // Connect to Ably with clientId for token auth
-      // Add random nonce to prevent browser caching the token request
+      // Use authCallback instead of authUrl for full control — always returns a fresh token
       const ably = new Ably.Realtime({
-        authUrl: `/api/ably-token?clientId=${userId}&t=${Date.now()}`,
         clientId: userId,
-        authMethod: "GET",
+        authCallback: async (_data, callback) => {
+          try {
+            const res = await fetch(`/api/ably-token?clientId=${userId}&t=${Date.now()}`);
+            if (!res.ok) throw new Error(`Token fetch failed: ${res.status}`);
+            const tokenRequest = await res.json();
+            callback(null, tokenRequest);
+          } catch (err) {
+            callback(String(err), null);
+          }
+        },
       });
       ablyRef.current = ably;
 
