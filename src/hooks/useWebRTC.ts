@@ -17,8 +17,8 @@ export function useWebRTC(roomId: string, userId: string) {
   const [error, setError] = useState<string | null>(null);
 
   const ablyRef = useRef<Ably.Realtime | null>(null);
+  // Single channel for both signaling AND presence
   const channelRef = useRef<Ably.RealtimeChannel | null>(null);
-  const presenceChannelRef = useRef<Ably.RealtimeChannel | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const remoteAudioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
@@ -28,12 +28,11 @@ export function useWebRTC(roomId: string, userId: string) {
 
   // Update participants from Ably Presence — source of truth for who is in the room
   const syncPresence = useCallback(async () => {
-    const channel = presenceChannelRef.current;
+    const channel = channelRef.current;
     if (!channel) return;
     const members = await channel.presence.get();
-    setParticipants((prev) => {
-      const next = new Map(prev);
-      // Add any new members
+    setParticipants(() => {
+      const next = new Map<string, Participant>();
       members.forEach((m) => {
         if (m.clientId !== userId) {
           next.set(m.clientId, {
@@ -41,12 +40,6 @@ export function useWebRTC(roomId: string, userId: string) {
             isMuted: (m.data as { isMuted?: boolean })?.isMuted ?? false,
             isSpeaking: false,
           });
-        }
-      });
-      // Remove members who left
-      next.forEach((_, id) => {
-        if (!members.find((m) => m.clientId === id)) {
-          next.delete(id);
         }
       });
       return next;
@@ -187,14 +180,10 @@ export function useWebRTC(roomId: string, userId: string) {
           audioEl.remove();
           remoteAudioRefs.current.delete(from);
         }
-        setParticipants((prev) => {
-          const next = new Map(prev);
-          next.delete(from);
-          return next;
-        });
+        syncPresence();
       }
     },
-    [userId, createPeerConnection]
+    [userId, createPeerConnection, syncPresence]
   );
 
   // Keep handleSignalRef up to date so channel.subscribe always calls latest version
@@ -224,31 +213,27 @@ export function useWebRTC(roomId: string, userId: string) {
         setError(`Ably connection failed: ${err?.reason?.message ?? "unknown"}`);
       });
 
-      // Signaling channel
+      // Single channel for both signaling and presence
       const channel = ably.channels.get(`voice-room:${roomId}`);
       channelRef.current = channel;
 
-      // Presence channel — source of truth for participant list
-      const presenceChannel = ably.channels.get(`voice-room-presence:${roomId}`);
-      presenceChannelRef.current = presenceChannel;
-
-      // Subscribe to presence events
-      presenceChannel.presence.subscribe(["enter", "leave", "update"], () => {
+      // Listen for presence changes (enter/leave/update) → sync participant list
+      channel.presence.subscribe(["enter", "leave", "update"], () => {
         syncPresence();
       });
 
-      // Subscribe to signals first, then enter presence + announce
+      // Subscribe to signals
       await channel.subscribe("signal", (msg) => {
         handleSignalRef.current(msg.data as SignalMessage);
       });
 
-      // Enter presence (triggers syncPresence for everyone else)
-      await presenceChannel.presence.enter({ isMuted: false });
+      // Enter presence so others know we're here
+      await channel.presence.enter({ isMuted: false });
 
-      // Sync own view of presence
+      // Sync initial participant list
       await syncPresence();
 
-      // Announce to existing users so they can initiate offers to us
+      // Announce to existing users so they initiate WebRTC offers to us
       channel.publish("signal", {
         type: "user-joined",
         from: userId,
@@ -266,7 +251,7 @@ export function useWebRTC(roomId: string, userId: string) {
       payload: {},
     } as SignalMessage);
 
-    presenceChannelRef.current?.presence.leave();
+    channelRef.current?.presence.leave();
 
     peerConnectionsRef.current.forEach((pc) => pc.close());
     peerConnectionsRef.current.clear();
@@ -292,8 +277,8 @@ export function useWebRTC(roomId: string, userId: string) {
       audioTrack.enabled = !audioTrack.enabled;
       const muted = !audioTrack.enabled;
       setIsMuted(muted);
-      // Update presence data so others see mute state
-      presenceChannelRef.current?.presence.update({ isMuted: muted });
+      // Update presence so others see mute state
+      channelRef.current?.presence.update({ isMuted: muted });
     }
   }, []);
 
