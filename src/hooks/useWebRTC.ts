@@ -18,12 +18,40 @@ export function useWebRTC(roomId: string, userId: string) {
 
   const ablyRef = useRef<Ably.Realtime | null>(null);
   const channelRef = useRef<Ably.RealtimeChannel | null>(null);
+  const presenceChannelRef = useRef<Ably.RealtimeChannel | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const remoteAudioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
 
   // Use ref for handleSignal to avoid stale closure in channel.subscribe
   const handleSignalRef = useRef<(message: SignalMessage) => Promise<void>>(async () => {});
+
+  // Update participants from Ably Presence — source of truth for who is in the room
+  const syncPresence = useCallback(async () => {
+    const channel = presenceChannelRef.current;
+    if (!channel) return;
+    const members = await channel.presence.get();
+    setParticipants((prev) => {
+      const next = new Map(prev);
+      // Add any new members
+      members.forEach((m) => {
+        if (m.clientId !== userId) {
+          next.set(m.clientId, {
+            userId: m.clientId,
+            isMuted: (m.data as { isMuted?: boolean })?.isMuted ?? false,
+            isSpeaking: false,
+          });
+        }
+      });
+      // Remove members who left
+      next.forEach((_, id) => {
+        if (!members.find((m) => m.clientId === id)) {
+          next.delete(id);
+        }
+      });
+      return next;
+    });
+  }, [userId]);
 
   const createPeerConnection = useCallback(
     (remoteUserId: string): RTCPeerConnection => {
@@ -71,28 +99,26 @@ export function useWebRTC(roomId: string, userId: string) {
       };
 
       pc.onconnectionstatechange = () => {
-        console.log(`[WebRTC] ${remoteUserId} state: ${pc.connectionState}`);
-        if (pc.connectionState === "connected") {
-          setParticipants((prev) => {
-            const next = new Map(prev);
-            next.set(remoteUserId, { userId: remoteUserId, isMuted: false, isSpeaking: false });
-            return next;
-          });
-        }
+        console.log(`[WebRTC] ${remoteUserId} connectionState: ${pc.connectionState}`);
         if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
-          setParticipants((prev) => {
-            const next = new Map(prev);
-            next.delete(remoteUserId);
-            return next;
-          });
           peerConnectionsRef.current.delete(remoteUserId);
+          syncPresence();
+        }
+      };
+
+      // Fallback: iceConnectionState is more reliable across browsers
+      pc.oniceconnectionstatechange = () => {
+        console.log(`[WebRTC] ${remoteUserId} iceConnectionState: ${pc.iceConnectionState}`);
+        if (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed") {
+          peerConnectionsRef.current.delete(remoteUserId);
+          syncPresence();
         }
       };
 
       peerConnectionsRef.current.set(remoteUserId, pc);
       return pc;
     },
-    [userId]
+    [userId, syncPresence]
   );
 
   const handleSignal = useCallback(
@@ -198,15 +224,31 @@ export function useWebRTC(roomId: string, userId: string) {
         setError(`Ably connection failed: ${err?.reason?.message ?? "unknown"}`);
       });
 
+      // Signaling channel
       const channel = ably.channels.get(`voice-room:${roomId}`);
       channelRef.current = channel;
 
-      // Subscribe first, then announce — avoids missing own signal
+      // Presence channel — source of truth for participant list
+      const presenceChannel = ably.channels.get(`voice-room-presence:${roomId}`);
+      presenceChannelRef.current = presenceChannel;
+
+      // Subscribe to presence events
+      presenceChannel.presence.subscribe(["enter", "leave", "update"], () => {
+        syncPresence();
+      });
+
+      // Subscribe to signals first, then enter presence + announce
       await channel.subscribe("signal", (msg) => {
         handleSignalRef.current(msg.data as SignalMessage);
       });
 
-      // Announce presence after subscribe is ready
+      // Enter presence (triggers syncPresence for everyone else)
+      await presenceChannel.presence.enter({ isMuted: false });
+
+      // Sync own view of presence
+      await syncPresence();
+
+      // Announce to existing users so they can initiate offers to us
       channel.publish("signal", {
         type: "user-joined",
         from: userId,
@@ -215,7 +257,7 @@ export function useWebRTC(roomId: string, userId: string) {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to join room");
     }
-  }, [roomId, userId]);
+  }, [roomId, userId, syncPresence]);
 
   const leaveRoom = useCallback(() => {
     channelRef.current?.publish("signal", {
@@ -223,6 +265,8 @@ export function useWebRTC(roomId: string, userId: string) {
       from: userId,
       payload: {},
     } as SignalMessage);
+
+    presenceChannelRef.current?.presence.leave();
 
     peerConnectionsRef.current.forEach((pc) => pc.close());
     peerConnectionsRef.current.clear();
@@ -246,7 +290,10 @@ export function useWebRTC(roomId: string, userId: string) {
     const audioTrack = localStreamRef.current.getAudioTracks()[0];
     if (audioTrack) {
       audioTrack.enabled = !audioTrack.enabled;
-      setIsMuted(!audioTrack.enabled);
+      const muted = !audioTrack.enabled;
+      setIsMuted(muted);
+      // Update presence data so others see mute state
+      presenceChannelRef.current?.presence.update({ isMuted: muted });
     }
   }, []);
 
