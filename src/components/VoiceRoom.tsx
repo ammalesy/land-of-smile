@@ -65,7 +65,7 @@ export function VoiceRoom({ roomId, userId, displayName }: VoiceRoomProps) {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-950 p-6">
-      <div className={`w-full space-y-6 ${hasScreenShare ? "max-w-3xl" : "max-w-sm"}`}>
+      <div className="w-full max-w-sm space-y-6">
 
         {/* Header */}
         <div className="text-center space-y-1">
@@ -109,31 +109,28 @@ export function VoiceRoom({ roomId, userId, displayName }: VoiceRoomProps) {
           />
         )}
 
-        {/* Participants + Controls row when screen share is active */}
-        <div className={hasScreenShare ? "flex flex-col sm:flex-row gap-6" : "space-y-6"}>
-          <div className={`rounded-2xl bg-white/5 border border-white/10 p-5 ${hasScreenShare ? "flex-1" : ""}`}>
-            <ParticipantList
-              participants={participants}
-              localUserId={userId}
-              localDisplayName={displayName}
-              localIsMuted={isMuted}
-              localIsScreenSharing={isScreenSharing}
-            />
-          </div>
-
-          <div className={hasScreenShare ? "flex items-end justify-center pb-1" : ""}>
-            <AudioControls
-              isMuted={isMuted}
-              isSoundMuted={isSoundMuted}
-              isConnected={isConnected}
-              isScreenSharing={isScreenSharing}
-              onToggleMute={toggleMute}
-              onToggleSoundMute={toggleSoundMute}
-              onLeave={handleLeave}
-              onToggleScreenShare={handleToggleScreenShare}
-            />
-          </div>
+        {/* Participants */}
+        <div className="rounded-2xl bg-white/5 border border-white/10 p-5">
+          <ParticipantList
+            participants={participants}
+            localUserId={userId}
+            localDisplayName={displayName}
+            localIsMuted={isMuted}
+            localIsScreenSharing={isScreenSharing}
+          />
         </div>
+
+        {/* Controls */}
+        <AudioControls
+          isMuted={isMuted}
+          isSoundMuted={isSoundMuted}
+          isConnected={isConnected}
+          isScreenSharing={isScreenSharing}
+          onToggleMute={toggleMute}
+          onToggleSoundMute={toggleSoundMute}
+          onLeave={handleLeave}
+          onToggleScreenShare={handleToggleScreenShare}
+        />
       </div>
     </div>
   );
