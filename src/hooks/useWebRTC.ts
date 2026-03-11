@@ -229,7 +229,7 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
       console.log(`[Signal] received: ${type} from ${from}`);
 
       if (type === "user-joined") {
-        // Someone joined — initiate offer (we are the existing user)
+        // Someone joined — initiate audio offer (we are the existing user)
         const pc = createPeerConnection(from);
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
@@ -239,6 +239,19 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
           to: from,
           payload: offer,
         } as SignalMessage);
+
+        // If we are currently screen sharing, send a screen offer to the new peer too
+        if (screenStreamRef.current) {
+          const screenPc = createScreenPeerConnection(from, false);
+          const screenOffer = await screenPc.createOffer();
+          await screenPc.setLocalDescription(screenOffer);
+          channelRef.current?.publish("signal", {
+            type: "offer",
+            from: `screen:${userId}`,
+            to: `screen:${from}`,
+            payload: screenOffer,
+          } as SignalMessage);
+        }
       }
 
       if (type === "offer") {
