@@ -9,12 +9,16 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
   const [isConnected, setIsConnected] = useState(false);
   const [audioBlocked, setAudioBlocked] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [remoteScreenStream, setRemoteScreenStream] = useState<{ peerId: string; stream: MediaStream } | null>(null);
 
   const ablyRef = useRef<Ably.Realtime | null>(null);
   // Single channel for both signaling AND presence
   const channelRef = useRef<Ably.RealtimeChannel | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const screenStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const screenPeerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const remoteAudioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
   const iceServersRef = useRef<RTCIceServer[]>([
     { urls: "stun:stun.l.google.com:19302" },
@@ -32,12 +36,13 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
       const next = new Map<string, Participant>();
       members.forEach((m) => {
         if (m.clientId !== userId) {
-          const data = m.data as { isMuted?: boolean; displayName?: string } | null;
+          const data = m.data as { isMuted?: boolean; displayName?: string; isScreenSharing?: boolean } | null;
           next.set(m.clientId, {
             userId: m.clientId,
             displayName: data?.displayName ?? m.clientId,
             isMuted: data?.isMuted ?? false,
             isSpeaking: false,
+            isScreenSharing: data?.isScreenSharing ?? false,
           });
         }
       });
@@ -124,9 +129,97 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
     [userId, syncPresence]
   );
 
+  const createScreenPeerConnection = useCallback(
+    (remoteUserId: string, asReceiver: boolean): RTCPeerConnection => {
+      const existing = screenPeerConnectionsRef.current.get(remoteUserId);
+      if (existing) existing.close();
+
+      const pc = new RTCPeerConnection({ iceServers: iceServersRef.current });
+
+      // Sender: add screen tracks
+      if (!asReceiver && screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach((track) => {
+          pc.addTrack(track, screenStreamRef.current!);
+        });
+      }
+
+      // Receiver: show incoming video stream
+      pc.ontrack = (event) => {
+        const [stream] = event.streams;
+        if (stream) {
+          setRemoteScreenStream({ peerId: remoteUserId, stream });
+        }
+      };
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          channelRef.current?.publish("signal", {
+            type: "ice-candidate",
+            from: `screen:${userId}`,
+            to: `screen:${remoteUserId}`,
+            payload: event.candidate.toJSON(),
+          } as SignalMessage);
+        }
+      };
+
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
+          screenPeerConnectionsRef.current.delete(remoteUserId);
+        }
+      };
+
+      screenPeerConnectionsRef.current.set(remoteUserId, pc);
+      return pc;
+    },
+    [userId]
+  );
+
   const handleSignal = useCallback(
     async (message: SignalMessage) => {
       const { type, from, to, payload } = message;
+
+      // Handle screen share ICE candidates (prefixed with "screen:")
+      const isScreenFrom = from.startsWith("screen:");
+      const isScreenTo = to?.startsWith("screen:");
+
+      if (isScreenFrom || isScreenTo) {
+        const actualFrom = isScreenFrom ? from.slice(7) : from;
+        const actualTo = isScreenTo ? to!.slice(7) : to;
+        if (actualTo && actualTo !== userId) return;
+        if (actualFrom === userId) return;
+
+        if (type === "offer") {
+          const pc = createScreenPeerConnection(actualFrom, true);
+          await pc.setRemoteDescription(new RTCSessionDescription(payload as RTCSessionDescriptionInit));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          channelRef.current?.publish("signal", {
+            type: "answer",
+            from: `screen:${userId}`,
+            to: `screen:${actualFrom}`,
+            payload: answer,
+          } as SignalMessage);
+        }
+
+        if (type === "answer") {
+          const pc = screenPeerConnectionsRef.current.get(actualFrom);
+          if (pc && pc.signalingState !== "stable") {
+            await pc.setRemoteDescription(new RTCSessionDescription(payload as RTCSessionDescriptionInit));
+          }
+        }
+
+        if (type === "ice-candidate") {
+          const pc = screenPeerConnectionsRef.current.get(actualFrom);
+          if (pc && pc.remoteDescription) {
+            try {
+              await pc.addIceCandidate(new RTCIceCandidate(payload as RTCIceCandidateInit));
+            } catch (e) {
+              console.warn("[ICE Screen] Failed to add candidate", e);
+            }
+          }
+        }
+        return;
+      }
 
       // Ignore messages not meant for this user (except broadcasts)
       if (to && to !== userId) return;
@@ -190,10 +283,31 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
           audioEl.remove();
           remoteAudioRefs.current.delete(from);
         }
+        // Clean up screen share PC if they disconnected
+        const screenPc = screenPeerConnectionsRef.current.get(from);
+        screenPc?.close();
+        screenPeerConnectionsRef.current.delete(from);
+        setRemoteScreenStream((prev) => (prev?.peerId === from ? null : prev));
+        syncPresence();
+      }
+
+      if (type === "screen-share-start") {
+        // Someone is starting to share — create a screen receiver PC and send an offer request
+        // They will send us an offer via screen-prefixed signaling
+        console.log(`[ScreenShare] ${from} started sharing`);
+        syncPresence();
+      }
+
+      if (type === "screen-share-stop") {
+        console.log(`[ScreenShare] ${from} stopped sharing`);
+        const screenPc = screenPeerConnectionsRef.current.get(from);
+        screenPc?.close();
+        screenPeerConnectionsRef.current.delete(from);
+        setRemoteScreenStream((prev) => (prev?.peerId === from ? null : prev));
         syncPresence();
       }
     },
-    [userId, createPeerConnection, syncPresence]
+    [userId, createPeerConnection, createScreenPeerConnection, syncPresence]
   );
 
   // Keep handleSignalRef up to date so channel.subscribe always calls latest version
@@ -276,6 +390,16 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
   }, [roomId, userId, syncPresence]);
 
   const leaveRoom = useCallback(() => {
+    // Stop screen share before leaving
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach((t) => t.stop());
+      screenStreamRef.current = null;
+    }
+    screenPeerConnectionsRef.current.forEach((pc) => pc.close());
+    screenPeerConnectionsRef.current.clear();
+    setIsScreenSharing(false);
+    setRemoteScreenStream(null);
+
     channelRef.current?.publish("signal", {
       type: "user-left",
       from: userId,
@@ -301,6 +425,68 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
     setParticipants(new Map());
   }, [userId]);
 
+  const startScreenShare = useCallback(async () => {
+    try {
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: { ideal: 15, max: 30 }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        audio: false,
+      });
+      screenStreamRef.current = screenStream;
+      setIsScreenSharing(true);
+
+      // Update presence so others see we're sharing
+      channelRef.current?.presence.update({ isMuted: isMuted, displayName, isScreenSharing: true });
+
+      // Broadcast screen-share-start so all peers know to expect an offer
+      channelRef.current?.publish("signal", {
+        type: "screen-share-start",
+        from: userId,
+        payload: {},
+      } as SignalMessage);
+
+      // Send screen offer to every connected peer
+      const peerIds = Array.from(peerConnectionsRef.current.keys());
+      for (const peerId of peerIds) {
+        const pc = createScreenPeerConnection(peerId, false);
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        channelRef.current?.publish("signal", {
+          type: "offer",
+          from: `screen:${userId}`,
+          to: `screen:${peerId}`,
+          payload: offer,
+        } as SignalMessage);
+      }
+
+      // Auto-stop when user ends share via OS dialog
+      screenStream.getVideoTracks()[0].onended = () => {
+        stopScreenShare();
+      };
+    } catch (err) {
+      // User cancelled or permission denied — not a fatal error
+      console.warn("[ScreenShare] getDisplayMedia failed:", err);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, displayName, isMuted, createScreenPeerConnection]);
+
+  const stopScreenShare = useCallback(() => {
+    screenStreamRef.current?.getTracks().forEach((t) => t.stop());
+    screenStreamRef.current = null;
+
+    screenPeerConnectionsRef.current.forEach((pc) => pc.close());
+    screenPeerConnectionsRef.current.clear();
+
+    setIsScreenSharing(false);
+
+    channelRef.current?.presence.update({ isMuted: isMuted, displayName, isScreenSharing: false });
+
+    channelRef.current?.publish("signal", {
+      type: "screen-share-stop",
+      from: userId,
+      payload: {},
+    } as SignalMessage);
+  }, [userId, displayName, isMuted]);
+
   const toggleMute = useCallback(() => {
     if (!localStreamRef.current) return;
     const audioTrack = localStreamRef.current.getAudioTracks()[0];
@@ -308,10 +494,10 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
       audioTrack.enabled = !audioTrack.enabled;
       const muted = !audioTrack.enabled;
       setIsMuted(muted);
-      // Update presence so others see mute state
-      channelRef.current?.presence.update({ isMuted: muted, displayName });
+      // Update presence so others see mute state (preserve isScreenSharing)
+      channelRef.current?.presence.update({ isMuted: muted, displayName, isScreenSharing });
     }
-  }, []);
+  }, [displayName, isScreenSharing]);
 
   const toggleSoundMute = useCallback(() => {
     setIsSoundMuted((prev) => {
@@ -347,10 +533,14 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
     isConnected,
     audioBlocked,
     error,
+    isScreenSharing,
+    remoteScreenStream,
     joinRoom,
     leaveRoom,
     toggleMute,
     toggleSoundMute,
     unlockAudio,
+    startScreenShare,
+    stopScreenShare,
   };
 }

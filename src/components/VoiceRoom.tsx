@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { ParticipantList } from "@/components/ParticipantList";
 import { AudioControls } from "@/components/AudioControls";
+import { ScreenShareView } from "@/components/ScreenShareView";
 import { useRouter } from "next/navigation";
 
 interface VoiceRoomProps {
@@ -17,6 +18,7 @@ export function VoiceRoom({ roomId, userId, displayName }: VoiceRoomProps) {
   const {
     participants, isMuted, isSoundMuted, isConnected, audioBlocked,
     error, joinRoom, leaveRoom, toggleMute, toggleSoundMute, unlockAudio,
+    isScreenSharing, remoteScreenStream, startScreenShare, stopScreenShare,
   } = useWebRTC(roomId, userId, displayName);
 
   useEffect(() => {
@@ -27,6 +29,19 @@ export function VoiceRoom({ roomId, userId, displayName }: VoiceRoomProps) {
     leaveRoom();
     router.push("/");
   };
+
+  const handleToggleScreenShare = () => {
+    if (isScreenSharing) {
+      stopScreenShare();
+    } else {
+      startScreenShare();
+    }
+  };
+
+  // Find the display name of the remote sharer (if any)
+  const remoteSharerName = remoteScreenStream
+    ? participants.get(remoteScreenStream.peerId)?.displayName ?? remoteScreenStream.peerId
+    : undefined;
 
   if (error) {
     return (
@@ -46,9 +61,11 @@ export function VoiceRoom({ roomId, userId, displayName }: VoiceRoomProps) {
     );
   }
 
+  const hasScreenShare = isScreenSharing || !!remoteScreenStream;
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-950 p-6">
-      <div className="w-full max-w-sm space-y-6">
+      <div className={`w-full space-y-6 ${hasScreenShare ? "max-w-3xl" : "max-w-sm"}`}>
 
         {/* Header */}
         <div className="text-center space-y-1">
@@ -77,26 +94,48 @@ export function VoiceRoom({ roomId, userId, displayName }: VoiceRoomProps) {
           </button>
         )}
 
-        {/* Participants */}
-        <div className="rounded-2xl bg-white/5 border border-white/10 p-5">
-          <ParticipantList
-            participants={participants}
-            localUserId={userId}
-            localDisplayName={displayName}
-            localIsMuted={isMuted}
+        {/* Screen Share View */}
+        {isScreenSharing && (
+          <ScreenShareView
+            localStream={null /* preview via OS — no need to show self */}
+            onStopShare={stopScreenShare}
+            sharerName={displayName}
           />
-        </div>
+        )}
+        {remoteScreenStream && !isScreenSharing && (
+          <ScreenShareView
+            remoteStream={remoteScreenStream.stream}
+            sharerName={remoteSharerName}
+          />
+        )}
 
-        {/* Controls */}
-        <AudioControls
-          isMuted={isMuted}
-          isSoundMuted={isSoundMuted}
-          isConnected={isConnected}
-          onToggleMute={toggleMute}
-          onToggleSoundMute={toggleSoundMute}
-          onLeave={handleLeave}
-        />
+        {/* Participants + Controls row when screen share is active */}
+        <div className={hasScreenShare ? "flex flex-col sm:flex-row gap-6" : "space-y-6"}>
+          <div className={`rounded-2xl bg-white/5 border border-white/10 p-5 ${hasScreenShare ? "flex-1" : ""}`}>
+            <ParticipantList
+              participants={participants}
+              localUserId={userId}
+              localDisplayName={displayName}
+              localIsMuted={isMuted}
+              localIsScreenSharing={isScreenSharing}
+            />
+          </div>
+
+          <div className={hasScreenShare ? "flex items-end justify-center pb-1" : ""}>
+            <AudioControls
+              isMuted={isMuted}
+              isSoundMuted={isSoundMuted}
+              isConnected={isConnected}
+              isScreenSharing={isScreenSharing}
+              onToggleMute={toggleMute}
+              onToggleSoundMute={toggleSoundMute}
+              onLeave={handleLeave}
+              onToggleScreenShare={handleToggleScreenShare}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
 }
+

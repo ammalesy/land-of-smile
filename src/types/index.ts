@@ -3,9 +3,17 @@ export interface Participant {
   displayName: string;
   isMuted: boolean;
   isSpeaking: boolean;
+  isScreenSharing: boolean;
 }
 
-export type SignalType = "offer" | "answer" | "ice-candidate" | "user-joined" | "user-left";
+export type SignalType =
+  | "offer"
+  | "answer"
+  | "ice-candidate"
+  | "user-joined"
+  | "user-left"
+  | "screen-share-start"
+  | "screen-share-stop";
 
 export interface SignalMessage {
   type: SignalType;

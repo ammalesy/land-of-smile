@@ -7,11 +7,12 @@ interface ParticipantListProps {
   localUserId: string;
   localDisplayName: string;
   localIsMuted: boolean;
+  localIsScreenSharing: boolean;
 }
 
-export function ParticipantList({ participants, localUserId, localDisplayName, localIsMuted }: ParticipantListProps) {
+export function ParticipantList({ participants, localUserId, localDisplayName, localIsMuted, localIsScreenSharing }: ParticipantListProps) {
   const allParticipants: Participant[] = [
-    { userId: localUserId, displayName: localDisplayName, isMuted: localIsMuted, isSpeaking: false },
+    { userId: localUserId, displayName: localDisplayName, isMuted: localIsMuted, isSpeaking: false, isScreenSharing: localIsScreenSharing },
     ...Array.from(participants.values()),
   ];
 
@@ -41,6 +42,11 @@ export function ParticipantList({ participants, localUserId, localDisplayName, l
               <span title="ปิดไมค์" className="text-red-400 text-xs">🔇</span>
             ) : (
               <span title="เปิดไมค์" className="text-green-400 text-xs">🎙️</span>
+            )}
+
+            {/* Screen share indicator */}
+            {p.isScreenSharing && (
+              <span title="กำลังแชร์หน้าจอ" className="text-indigo-400 text-xs">🖥️</span>
             )}
           </li>
         ))}
