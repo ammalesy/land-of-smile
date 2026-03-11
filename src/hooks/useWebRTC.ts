@@ -15,6 +15,7 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
   const [isMuted, setIsMuted] = useState(false);
   const [isSoundMuted, setIsSoundMuted] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [audioBlocked, setAudioBlocked] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const ablyRef = useRef<Ably.Realtime | null>(null);
@@ -64,22 +65,33 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
         pc.addTrack(track, localStreamRef.current!);
       });
 
-      // Handle incoming remote audio — fix autoplay policy with explicit play()
+      // Handle incoming remote audio
       pc.ontrack = (event) => {
         const [remoteStream] = event.streams;
         if (!remoteStream) return;
 
         let audioEl = remoteAudioRefs.current.get(remoteUserId);
         if (!audioEl) {
-          audioEl = new Audio();
+          audioEl = document.createElement("audio");
+          // Safari iOS requires these attributes
           audioEl.autoplay = true;
-          document.body.appendChild(audioEl); // must be in DOM for some browsers
+          audioEl.setAttribute("playsinline", "");
+          audioEl.setAttribute("webkit-playsinline", "");
+          audioEl.muted = false;
+          document.body.appendChild(audioEl);
           remoteAudioRefs.current.set(remoteUserId, audioEl);
         }
+
         audioEl.srcObject = remoteStream;
-        audioEl.play().catch(() => {
-          // Autoplay blocked — will play on next user interaction
-        });
+
+        const playPromise = audioEl.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((err) => {
+            console.warn("[Audio] Autoplay blocked (likely iOS):", err);
+            // Signal to UI that user interaction is needed to unlock audio
+            setAudioBlocked(true);
+          });
+        }
       };
 
       // Send ICE candidates via Ably
@@ -305,6 +317,16 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
     });
   }, []);
 
+  // Called from a user gesture (tap) to unlock audio on iOS Safari
+  const unlockAudio = useCallback(() => {
+    remoteAudioRefs.current.forEach((audio) => {
+      if (audio.paused) {
+        audio.play().catch(() => {});
+      }
+    });
+    setAudioBlocked(false);
+  }, []);
+
   useEffect(() => {
     return () => {
       leaveRoom();
@@ -316,10 +338,12 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
     isMuted,
     isSoundMuted,
     isConnected,
+    audioBlocked,
     error,
     joinRoom,
     leaveRoom,
     toggleMute,
     toggleSoundMute,
+    unlockAudio,
   };
 }

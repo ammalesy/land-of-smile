@@ -14,8 +14,10 @@ interface VoiceRoomProps {
 
 export function VoiceRoom({ roomId, userId, displayName }: VoiceRoomProps) {
   const router = useRouter();
-  const { participants, isMuted, isSoundMuted, isConnected, error, joinRoom, leaveRoom, toggleMute, toggleSoundMute } =
-    useWebRTC(roomId, userId, displayName);
+  const {
+    participants, isMuted, isSoundMuted, isConnected, audioBlocked,
+    error, joinRoom, leaveRoom, toggleMute, toggleSoundMute, unlockAudio,
+  } = useWebRTC(roomId, userId, displayName);
 
   useEffect(() => {
     joinRoom();
@@ -64,6 +66,16 @@ export function VoiceRoom({ roomId, userId, displayName }: VoiceRoomProps) {
             </span>
           </div>
         </div>
+
+        {/* iOS Safari audio unlock banner */}
+        {audioBlocked && (
+          <button
+            onClick={unlockAudio}
+            className="w-full rounded-2xl bg-yellow-500/20 border border-yellow-500/40 px-4 py-4 text-sm text-yellow-300 font-medium text-center active:scale-95 transition-all"
+          >
+            🔈 แตะที่นี่เพื่อเปิดเสียง
+          </button>
+        )}
 
         {/* Participants */}
         <div className="rounded-2xl bg-white/5 border border-white/10 p-5">
