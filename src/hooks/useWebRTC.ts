@@ -2,14 +2,6 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import Ably from "ably";
 import { Participant, SignalMessage } from "@/types";
 
-const ICE_SERVERS: RTCConfiguration = {
-  iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" },
-    { urls: "stun:stun2.l.google.com:19302" },
-  ],
-};
-
 export function useWebRTC(roomId: string, userId: string, displayName: string) {
   const [participants, setParticipants] = useState<Map<string, Participant>>(new Map());
   const [isMuted, setIsMuted] = useState(false);
@@ -24,6 +16,9 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
   const localStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const remoteAudioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
+  const iceServersRef = useRef<RTCIceServer[]>([
+    { urls: "stun:stun.l.google.com:19302" },
+  ]);
 
   // Use ref for handleSignal to avoid stale closure in channel.subscribe
   const handleSignalRef = useRef<(message: SignalMessage) => Promise<void>>(async () => {});
@@ -58,7 +53,7 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
         existing.close();
       }
 
-      const pc = new RTCPeerConnection(ICE_SERVERS);
+      const pc = new RTCPeerConnection({ iceServers: iceServersRef.current });
 
       // Add local tracks to peer connection
       localStreamRef.current?.getTracks().forEach((track) => {
@@ -208,6 +203,18 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
 
   const joinRoom = useCallback(async () => {
     try {
+      // Fetch ICE servers (STUN + TURN) from API — keeps credentials server-side
+      try {
+        const iceRes = await fetch("/api/ice-servers");
+        if (iceRes.ok) {
+          const { iceServers } = await iceRes.json();
+          iceServersRef.current = iceServers;
+          console.log("[ICE] Loaded", iceServers.length, "servers");
+        }
+      } catch {
+        console.warn("[ICE] Failed to fetch ICE servers, using STUN only");
+      }
+
       // Get microphone access
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
       localStreamRef.current = stream;
