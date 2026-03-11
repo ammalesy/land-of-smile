@@ -18,12 +18,13 @@ export async function GET() {
   const client = new Ably.Rest(apiKey);
 
   // List all channels that match "voice-room:*"
+  // Ably returns a plain array of channel ID strings when using by=id
   const channelList = await client.request("GET", "/channels", 100, {
     prefix: "voice-room:",
     by: "id",
   });
 
-  if (!channelList.success) {
+  if (!channelList.success || !Array.isArray(channelList.items)) {
     return NextResponse.json({ rooms: [] });
   }
 
@@ -31,30 +32,42 @@ export async function GET() {
 
   // Fetch presence for each active channel
   await Promise.all(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    channelList.items.map(async (ch: any) => {
-      const channelId: string = ch.channelId ?? ch.id ?? "";
+    channelList.items.map(async (item: unknown) => {
+      // items is an array of channel ID strings e.g. "voice-room:abc123"
+      const channelId = typeof item === "string" ? item : String(item);
       if (!channelId.startsWith("voice-room:")) return;
 
       const roomId = channelId.replace("voice-room:", "");
 
       try {
-        const presenceResult = await client.request("GET", `/channels/${encodeURIComponent(channelId)}/presence`, 100, {});
+        const presenceResult = await client.request(
+          "GET",
+          `/channels/${encodeURIComponent(channelId)}/presence`,
+          100,
+          {}
+        );
 
-        if (!presenceResult.success) return;
+        if (!presenceResult.success || !Array.isArray(presenceResult.items)) return;
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const members = presenceResult.items.map((m: any) => ({
-          displayName: m.data?.displayName ?? m.clientId ?? "Unknown",
-          isMuted: m.data?.isMuted ?? false,
-          isScreenSharing: m.data?.isScreenSharing ?? false,
-        }));
+        const members = presenceResult.items.map((m: { data?: unknown; clientId?: string }) => {
+          // data may be a JSON string or already an object depending on encoding
+          let parsed: { displayName?: string; isMuted?: boolean; isScreenSharing?: boolean } = {};
+          try {
+            parsed = typeof m.data === "string" ? JSON.parse(m.data) : (m.data as typeof parsed ?? {});
+          } catch { /* use empty defaults */ }
+
+          return {
+            displayName: parsed.displayName ?? m.clientId ?? "Unknown",
+            isMuted: parsed.isMuted ?? false,
+            isScreenSharing: parsed.isScreenSharing ?? false,
+          };
+        });
 
         if (members.length > 0) {
           rooms.push({ roomId, memberCount: members.length, members });
         }
       } catch {
-        // Channel exists but no presence — skip
+        // Channel exists but presence unavailable — skip
       }
     })
   );
