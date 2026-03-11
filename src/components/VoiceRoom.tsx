@@ -110,11 +110,10 @@ export function VoiceRoom({ roomId, userId, displayName, roomName }: VoiceRoomPr
 
         {/* Header */}
         <div className="text-center space-y-1">
-          <h1 className="text-2xl font-bold text-white">🎙 Land of Smile</h1>
-          {roomName && (
-            <p className="text-base font-semibold text-indigo-300">{roomName}</p>
-          )}
-          <p className="text-sm text-gray-500 font-mono">
+          <h1 className="text-2xl font-bold text-white">
+            {roomName || "ห้องสนทนา"}
+          </h1>
+          <p className="text-xs text-gray-500 font-mono">
             #{roomId}
           </p>
           <div className="flex items-center justify-center gap-2 text-xs">
