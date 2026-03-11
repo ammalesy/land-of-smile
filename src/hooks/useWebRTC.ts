@@ -13,6 +13,7 @@ const ICE_SERVERS: RTCConfiguration = {
 export function useWebRTC(roomId: string, userId: string) {
   const [participants, setParticipants] = useState<Map<string, Participant>>(new Map());
   const [isMuted, setIsMuted] = useState(false);
+  const [isSoundMuted, setIsSoundMuted] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -291,6 +292,17 @@ export function useWebRTC(roomId: string, userId: string) {
     }
   }, []);
 
+  const toggleSoundMute = useCallback(() => {
+    setIsSoundMuted((prev) => {
+      const next = !prev;
+      // Mute/unmute all remote audio elements
+      remoteAudioRefs.current.forEach((audio) => {
+        audio.muted = next;
+      });
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     return () => {
       leaveRoom();
@@ -300,10 +312,12 @@ export function useWebRTC(roomId: string, userId: string) {
   return {
     participants,
     isMuted,
+    isSoundMuted,
     isConnected,
     error,
     joinRoom,
     leaveRoom,
     toggleMute,
+    toggleSoundMute,
   };
 }

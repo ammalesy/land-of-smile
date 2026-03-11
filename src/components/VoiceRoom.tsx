@@ -13,7 +13,7 @@ interface VoiceRoomProps {
 
 export function VoiceRoom({ roomId, userId }: VoiceRoomProps) {
   const router = useRouter();
-  const { participants, isMuted, isConnected, error, joinRoom, leaveRoom, toggleMute } =
+  const { participants, isMuted, isSoundMuted, isConnected, error, joinRoom, leaveRoom, toggleMute, toggleSoundMute } =
     useWebRTC(roomId, userId);
 
   useEffect(() => {
@@ -76,8 +76,10 @@ export function VoiceRoom({ roomId, userId }: VoiceRoomProps) {
         {/* Controls */}
         <AudioControls
           isMuted={isMuted}
+          isSoundMuted={isSoundMuted}
           isConnected={isConnected}
           onToggleMute={toggleMute}
+          onToggleSoundMute={toggleSoundMute}
           onLeave={handleLeave}
         />
       </div>
