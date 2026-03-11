@@ -45,8 +45,16 @@ export function VoiceRoom({ roomId, userId, displayName }: VoiceRoomProps) {
 
   if (error) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-950">
-        <div className="rounded-2xl bg-red-900/30 border border-red-500/30 p-8 text-center max-w-md">
+      <div className="relative flex min-h-screen items-center justify-center">
+        <div className="galaxy-bg" aria-hidden="true">
+          <div className="stars-layer stars-tiny" />
+          <div className="stars-layer stars-medium" />
+          <div className="stars-layer stars-bright" />
+          <div className="shooting-star" />
+          <div className="shooting-star" />
+          <div className="black-hole" />
+        </div>
+        <div className="relative z-10 rounded-2xl bg-red-900/30 border border-red-500/30 p-8 text-center max-w-md">
           <p className="text-3xl mb-3">⚠️</p>
           <p className="text-red-400 font-semibold mb-2">เกิดข้อผิดพลาด</p>
           <p className="text-sm text-red-300/70 mb-6">{error}</p>
@@ -64,10 +72,22 @@ export function VoiceRoom({ roomId, userId, displayName }: VoiceRoomProps) {
   const hasScreenShare = isScreenSharing || !!remoteScreenStream;
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-950 p-6">
+    <div className="relative flex min-h-screen flex-col items-center justify-center p-6">
+
+      {/* ── Galaxy Background ─────────────────────────── */}
+      <div className="galaxy-bg" aria-hidden="true">
+        <div className="stars-layer stars-tiny" />
+        <div className="stars-layer stars-medium" />
+        <div className="stars-layer stars-bright" />
+        <div className="shooting-star" />
+        <div className="shooting-star" />
+        <div className="shooting-star" />
+        <div className="black-hole" />
+      </div>
+
       {/* Screen share — centered, user-resizable width */}
       {(isScreenSharing || remoteScreenStream) && (
-        <div className="flex justify-center w-full mb-6">
+        <div className="relative z-10 flex justify-center w-full mb-6">
           {isScreenSharing && (
             <ScreenShareView
               localStream={null}
@@ -85,7 +105,7 @@ export function VoiceRoom({ roomId, userId, displayName }: VoiceRoomProps) {
       )}
 
       {/* Main card — always narrow */}
-      <div className="w-full max-w-sm space-y-6">
+      <div className="relative z-10 w-full max-w-sm space-y-6">
 
         {/* Header */}
         <div className="text-center space-y-1">
