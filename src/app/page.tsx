@@ -142,12 +142,8 @@ export default function Home() {
             aria-label="ชื่อที่แสดง"
             maxLength={30}
             required
-            className={`w-full rounded-xl bg-white/5 border px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors
-              ${!hasName ? "border-red-500/50" : "border-white/10"}`}
+            className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
           />
-          {!hasName && (
-            <p className="text-xs text-red-400">* กรุณาใส่ชื่อก่อนเข้าห้อง</p>
-          )}
         </div>
 
         {/* Room List */}
