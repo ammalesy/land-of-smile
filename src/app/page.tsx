@@ -24,7 +24,18 @@ export default function Home() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-950 p-6">
+    <div className="relative flex min-h-screen flex-col items-center justify-center bg-gray-950 p-6">
+
+      {/* Create Room — top-right corner */}
+      <div className="absolute top-5 right-5">
+        <button
+          onClick={handleCreate}
+          className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 active:scale-95 transition-all shadow-lg"
+        >
+          🎙 สร้างห้องใหม่
+        </button>
+      </div>
+
       <div className="w-full max-w-sm space-y-8 text-center">
 
         {/* Logo / Title */}
@@ -49,21 +60,6 @@ export default function Home() {
             maxLength={30}
             className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
-        </div>
-
-        {/* Create Room */}
-        <button
-          onClick={handleCreate}
-          className="w-full rounded-2xl bg-indigo-600 py-4 text-base font-semibold text-white hover:bg-indigo-500 active:scale-95 transition-all"
-        >
-          🎙 สร้างห้องใหม่
-        </button>
-
-        {/* Divider */}
-        <div className="flex items-center gap-3">
-          <div className="flex-1 h-px bg-white/10" />
-          <span className="text-xs text-gray-500">หรือเข้าห้องที่มีอยู่</span>
-          <div className="flex-1 h-px bg-white/10" />
         </div>
 
         {/* Join Room */}
