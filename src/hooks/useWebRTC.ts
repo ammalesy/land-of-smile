@@ -133,17 +133,19 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
   );
 
   const createScreenPeerConnection = useCallback(
-    (remoteUserId: string, asReceiver: boolean): RTCPeerConnection => {
+    (remoteUserId: string, asReceiver: boolean, stream?: MediaStream): RTCPeerConnection => {
       const existing = screenPeerConnectionsRef.current.get(remoteUserId);
       if (existing) existing.close();
 
       const pc = new RTCPeerConnection({ iceServers: iceServersRef.current });
 
-      // Sender: add screen tracks
-      if (!asReceiver && screenStreamRef.current) {
-        screenStreamRef.current.getTracks().forEach((track) => {
-          pc.addTrack(track, screenStreamRef.current!);
+      // Sender: add screen tracks — use explicit stream arg first, fallback to ref
+      const sourceStream = stream ?? screenStreamRef.current;
+      if (!asReceiver && sourceStream) {
+        sourceStream.getTracks().forEach((track) => {
+          pc.addTrack(track, sourceStream);
         });
+        console.log("[ScreenShare] addTrack called, tracks:", sourceStream.getTracks().length);
       }
 
       // Receiver: show incoming video stream
@@ -263,7 +265,7 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
 
         // If we are currently screen sharing, send a screen offer to the new peer too
         if (screenStreamRef.current) {
-          const screenPc = createScreenPeerConnection(from, false);
+          const screenPc = createScreenPeerConnection(from, false, screenStreamRef.current);
           const screenOffer = await screenPc.createOffer();
           await screenPc.setLocalDescription(screenOffer);
           channelRef.current?.publish("signal", {
@@ -484,13 +486,13 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
         video: { frameRate: { ideal: 15, max: 30 }, width: { ideal: 1920 }, height: { ideal: 1080 } },
         audio: false,
       });
+
+      // Set ref BEFORE createScreenPeerConnection so addTrack can use it
       screenStreamRef.current = screenStream;
+
+      // Update presence & broadcast intent
       setIsScreenSharing(true);
-
-      // Update presence so others see we're sharing
       channelRef.current?.presence.update({ isMuted: isMuted, displayName, isScreenSharing: true });
-
-      // Broadcast screen-share-start so all peers know to expect an offer
       channelRef.current?.publish("signal", {
         type: "screen-share-start",
         from: userId,
@@ -499,8 +501,14 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
 
       // Send screen offer to every connected peer
       const peerIds = Array.from(peerConnectionsRef.current.keys());
+      console.log("[ScreenShare] starting share, peers:", peerIds);
+
       for (const peerId of peerIds) {
-        const pc = createScreenPeerConnection(peerId, false);
+        // Pass screenStream explicitly so addTrack is guaranteed even if ref timing is off
+        const pc = createScreenPeerConnection(peerId, false, screenStream);
+
+        console.log("[ScreenShare] senders after addTrack:", pc.getSenders().length);
+
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         channelRef.current?.publish("signal", {
