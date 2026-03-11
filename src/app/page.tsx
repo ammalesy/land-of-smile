@@ -10,7 +10,8 @@ export default function Home() {
   const [roomInput, setRoomInput] = useState("");
 
   const handleCreate = () => {
-    const name = displayName.trim() || "ไม่ระบุชื่อ";
+    const name = displayName.trim();
+    if (!name) return;
     const newRoomId = uuidv4().slice(0, 8);
     router.push(`/room/${newRoomId}?name=${encodeURIComponent(name)}`);
   };
@@ -18,10 +19,12 @@ export default function Home() {
   const handleJoin = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = roomInput.trim();
-    if (!trimmed) return;
-    const name = displayName.trim() || "ไม่ระบุชื่อ";
+    const name = displayName.trim();
+    if (!trimmed || !name) return;
     router.push(`/room/${trimmed}?name=${encodeURIComponent(name)}`);
   };
+
+  const hasName = displayName.trim().length > 0;
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center bg-gray-950 p-6">
@@ -30,7 +33,9 @@ export default function Home() {
       <div className="absolute top-5 right-5">
         <button
           onClick={handleCreate}
-          className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 active:scale-95 transition-all shadow-lg"
+          disabled={!hasName}
+          aria-label="สร้างห้องใหม่"
+          className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 active:scale-95 transition-all shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
         >
           🎙 สร้างห้องใหม่
         </button>
@@ -58,8 +63,13 @@ export default function Home() {
             placeholder="ใส่ชื่อของคุณ..."
             aria-label="ชื่อที่แสดง"
             maxLength={30}
-            className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            required
+            className={`w-full rounded-xl bg-white/5 border px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors
+              ${!hasName ? "border-red-500/50" : "border-white/10"}`}
           />
+          {!hasName && (
+            <p className="text-xs text-red-400">* กรุณาใส่ชื่อก่อนเข้าห้อง</p>
+          )}
         </div>
 
         {/* Join Room */}
@@ -74,7 +84,7 @@ export default function Home() {
           />
           <button
             type="submit"
-            disabled={!roomInput.trim()}
+            disabled={!roomInput.trim() || !hasName}
             className="w-full rounded-2xl bg-white/10 py-4 text-base font-semibold text-white hover:bg-white/20 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
             เข้าร่วมห้อง →
