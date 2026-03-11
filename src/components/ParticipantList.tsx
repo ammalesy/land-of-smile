@@ -18,7 +18,7 @@ export function ParticipantList({ participants, localUserId, localDisplayName, l
   return (
     <div className="flex flex-col gap-3">
       <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
-        Participants ({allParticipants.length}/5)
+        Participants ({allParticipants.length}/7)
       </h2>
       <ul className="flex flex-col gap-2">
         {allParticipants.map((p) => (

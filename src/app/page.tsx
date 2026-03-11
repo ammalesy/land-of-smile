@@ -42,7 +42,7 @@ export default function Home() {
         <div className="space-y-2">
           <p className="text-5xl">😊</p>
           <h1 className="text-3xl font-bold text-white">Land of Smile</h1>
-          <p className="text-sm text-gray-400">Group Voice Chat — รองรับสูงสุด 5 คน</p>
+          <p className="text-sm text-gray-400">Group Voice Chat — รองรับสูงสุด 7 คน</p>
         </div>
 
         {/* Display Name — shared for both create and join */}
