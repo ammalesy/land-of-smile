@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 const COOKIE_NAME = "los_auth";
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 90; // 90 days (3 months)
 
 export async function POST(request: Request) {
   const { password } = await request.json();
