@@ -65,6 +65,26 @@ export function VoiceRoom({ roomId, userId, displayName }: VoiceRoomProps) {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-950 p-6">
+      {/* Screen share sits outside the narrow card, spanning 90vw */}
+      {(isScreenSharing || remoteScreenStream) && (
+        <div className="w-full mb-6" style={{ maxWidth: "90vw" }}>
+          {isScreenSharing && (
+            <ScreenShareView
+              localStream={null}
+              onStopShare={stopScreenShare}
+              sharerName={displayName}
+            />
+          )}
+          {remoteScreenStream && !isScreenSharing && (
+            <ScreenShareView
+              remoteStream={remoteScreenStream.stream}
+              sharerName={remoteSharerName}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Main card — always narrow */}
       <div className="w-full max-w-sm space-y-6">
 
         {/* Header */}
@@ -73,7 +93,6 @@ export function VoiceRoom({ roomId, userId, displayName }: VoiceRoomProps) {
           <p className="text-sm text-gray-400">
             Room: <span className="font-mono text-indigo-400">{roomId}</span>
           </p>
-          {/* Connection status */}
           <div className="flex items-center justify-center gap-2 text-xs">
             <span
               className={`h-2 w-2 rounded-full ${isConnected ? "bg-green-400 animate-pulse" : "bg-yellow-400"}`}
@@ -92,21 +111,6 @@ export function VoiceRoom({ roomId, userId, displayName }: VoiceRoomProps) {
           >
             🔈 แตะที่นี่เพื่อเปิดเสียง
           </button>
-        )}
-
-        {/* Screen Share View */}
-        {isScreenSharing && (
-          <ScreenShareView
-            localStream={null /* preview via OS — no need to show self */}
-            onStopShare={stopScreenShare}
-            sharerName={displayName}
-          />
-        )}
-        {remoteScreenStream && !isScreenSharing && (
-          <ScreenShareView
-            remoteStream={remoteScreenStream.stream}
-            sharerName={remoteSharerName}
-          />
         )}
 
         {/* Participants */}
@@ -135,4 +139,3 @@ export function VoiceRoom({ roomId, userId, displayName }: VoiceRoomProps) {
     </div>
   );
 }
-
