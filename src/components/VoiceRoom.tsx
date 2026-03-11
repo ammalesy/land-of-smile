@@ -104,7 +104,7 @@ export function VoiceRoom({ roomId, userId, displayName }: VoiceRoomProps) {
         </div>
       )}
 
-      {/* Main card — always narrow */}
+      {/* Main card */}
       <div className="relative z-10 w-full max-w-sm space-y-6">
 
         {/* Header */}

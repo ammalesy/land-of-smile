@@ -148,7 +148,13 @@ export default function Home() {
                       <div className="flex items-center justify-between gap-2">
                         {/* Room ID + member count */}
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-base">{isSelected ? "✅" : "🎙"}</span>
+                          {/* Radio button indicator */}
+                          <span className={`shrink-0 flex items-center justify-center w-4 h-4 rounded-full border-2 transition-all
+                            ${isSelected ? "border-indigo-400" : "border-gray-500"}`}>
+                            {isSelected && (
+                              <span className="w-2 h-2 rounded-full bg-indigo-400 block" />
+                            )}
+                          </span>
                           <span className="font-mono text-sm text-indigo-300 truncate">{room.roomId}</span>
                         </div>
                         <span className="shrink-0 text-xs text-gray-400">
@@ -157,7 +163,7 @@ export default function Home() {
                       </div>
 
                       {/* Member names */}
-                      <div className="mt-1.5 flex flex-wrap gap-1">
+                      <div className="mt-1.5 flex flex-wrap justify-end gap-1">
                         {room.members.map((m, i) => (
                           <span
                             key={i}
