@@ -65,9 +65,9 @@ export function VoiceRoom({ roomId, userId, displayName }: VoiceRoomProps) {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-950 p-6">
-      {/* Screen share sits outside the narrow card, spanning 90vw */}
+      {/* Screen share — centered, user-resizable width */}
       {(isScreenSharing || remoteScreenStream) && (
-        <div className="w-full mb-6" style={{ maxWidth: "90vw" }}>
+        <div className="flex justify-center w-full mb-6">
           {isScreenSharing && (
             <ScreenShareView
               localStream={null}
