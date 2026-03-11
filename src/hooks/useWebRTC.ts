@@ -20,6 +20,9 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const screenPeerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const remoteAudioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
+  // ICE candidate queues — holds candidates that arrive before setRemoteDescription completes
+  const iceCandidateQueueRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
+  const screenIceCandidateQueueRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const iceServersRef = useRef<RTCIceServer[]>([
     { urls: "stun:stun.l.google.com:19302" },
   ]);
@@ -191,6 +194,13 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
         if (type === "offer") {
           const pc = createScreenPeerConnection(actualFrom, true);
           await pc.setRemoteDescription(new RTCSessionDescription(payload as RTCSessionDescriptionInit));
+          // Drain any ICE candidates that arrived before setRemoteDescription
+          const queued = screenIceCandidateQueueRef.current.get(actualFrom) ?? [];
+          for (const c of queued) {
+            try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch { /* ignore */ }
+          }
+          screenIceCandidateQueueRef.current.delete(actualFrom);
+
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
           channelRef.current?.publish("signal", {
@@ -205,6 +215,12 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
           const pc = screenPeerConnectionsRef.current.get(actualFrom);
           if (pc && pc.signalingState !== "stable") {
             await pc.setRemoteDescription(new RTCSessionDescription(payload as RTCSessionDescriptionInit));
+            // Drain any ICE candidates that arrived before setRemoteDescription
+            const queued = screenIceCandidateQueueRef.current.get(actualFrom) ?? [];
+            for (const c of queued) {
+              try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch { /* ignore */ }
+            }
+            screenIceCandidateQueueRef.current.delete(actualFrom);
           }
         }
 
@@ -216,6 +232,11 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
             } catch (e) {
               console.warn("[ICE Screen] Failed to add candidate", e);
             }
+          } else {
+            // Queue candidate until setRemoteDescription completes
+            const q = screenIceCandidateQueueRef.current.get(actualFrom) ?? [];
+            q.push(payload as RTCIceCandidateInit);
+            screenIceCandidateQueueRef.current.set(actualFrom, q);
           }
         }
         return;
@@ -255,9 +276,16 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
       }
 
       if (type === "offer") {
-        // We received an offer — create answer
+        // We received an audio offer — create answer
         const pc = createPeerConnection(from);
         await pc.setRemoteDescription(new RTCSessionDescription(payload as RTCSessionDescriptionInit));
+        // Drain any ICE candidates that arrived before setRemoteDescription
+        const queued = iceCandidateQueueRef.current.get(from) ?? [];
+        for (const c of queued) {
+          try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch { /* ignore */ }
+        }
+        iceCandidateQueueRef.current.delete(from);
+
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         channelRef.current?.publish("signal", {
@@ -272,6 +300,12 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
         const pc = peerConnectionsRef.current.get(from);
         if (pc && pc.signalingState !== "stable") {
           await pc.setRemoteDescription(new RTCSessionDescription(payload as RTCSessionDescriptionInit));
+          // Drain any ICE candidates that arrived before setRemoteDescription
+          const queued = iceCandidateQueueRef.current.get(from) ?? [];
+          for (const c of queued) {
+            try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch { /* ignore */ }
+          }
+          iceCandidateQueueRef.current.delete(from);
         }
       }
 
@@ -283,6 +317,11 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
           } catch (e) {
             console.warn("[ICE] Failed to add candidate", e);
           }
+        } else {
+          // Queue candidate until setRemoteDescription completes
+          const q = iceCandidateQueueRef.current.get(from) ?? [];
+          q.push(payload as RTCIceCandidateInit);
+          iceCandidateQueueRef.current.set(from, q);
         }
       }
 
@@ -290,6 +329,7 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
         const pc = peerConnectionsRef.current.get(from);
         pc?.close();
         peerConnectionsRef.current.delete(from);
+        iceCandidateQueueRef.current.delete(from);
         const audioEl = remoteAudioRefs.current.get(from);
         if (audioEl) {
           audioEl.srcObject = null;
@@ -300,13 +340,12 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
         const screenPc = screenPeerConnectionsRef.current.get(from);
         screenPc?.close();
         screenPeerConnectionsRef.current.delete(from);
+        screenIceCandidateQueueRef.current.delete(from);
         setRemoteScreenStream((prev) => (prev?.peerId === from ? null : prev));
         syncPresence();
       }
 
       if (type === "screen-share-start") {
-        // Someone is starting to share — create a screen receiver PC and send an offer request
-        // They will send us an offer via screen-prefixed signaling
         console.log(`[ScreenShare] ${from} started sharing`);
         syncPresence();
       }
@@ -316,6 +355,7 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
         const screenPc = screenPeerConnectionsRef.current.get(from);
         screenPc?.close();
         screenPeerConnectionsRef.current.delete(from);
+        screenIceCandidateQueueRef.current.delete(from);
         setRemoteScreenStream((prev) => (prev?.peerId === from ? null : prev));
         syncPresence();
       }
