@@ -6,18 +6,21 @@ import { v4 as uuidv4 } from "uuid";
 
 export default function Home() {
   const router = useRouter();
+  const [displayName, setDisplayName] = useState("");
   const [roomInput, setRoomInput] = useState("");
 
   const handleCreate = () => {
+    const name = displayName.trim() || "ไม่ระบุชื่อ";
     const newRoomId = uuidv4().slice(0, 8);
-    router.push(`/room/${newRoomId}`);
+    router.push(`/room/${newRoomId}?name=${encodeURIComponent(name)}`);
   };
 
   const handleJoin = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = roomInput.trim();
     if (!trimmed) return;
-    router.push(`/room/${trimmed}`);
+    const name = displayName.trim() || "ไม่ระบุชื่อ";
+    router.push(`/room/${trimmed}?name=${encodeURIComponent(name)}`);
   };
 
   return (
@@ -29,6 +32,23 @@ export default function Home() {
           <p className="text-5xl">😊</p>
           <h1 className="text-3xl font-bold text-white">Land of Smile</h1>
           <p className="text-sm text-gray-400">Group Voice Chat — รองรับสูงสุด 5 คน</p>
+        </div>
+
+        {/* Display Name — shared for both create and join */}
+        <div className="space-y-2 text-left">
+          <label htmlFor="displayName" className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+            ชื่อที่แสดง
+          </label>
+          <input
+            id="displayName"
+            type="text"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            placeholder="ใส่ชื่อของคุณ..."
+            aria-label="ชื่อที่แสดง"
+            maxLength={30}
+            className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
         </div>
 
         {/* Create Room */}

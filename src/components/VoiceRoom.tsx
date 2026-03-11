@@ -9,12 +9,13 @@ import { useRouter } from "next/navigation";
 interface VoiceRoomProps {
   roomId: string;
   userId: string;
+  displayName: string;
 }
 
-export function VoiceRoom({ roomId, userId }: VoiceRoomProps) {
+export function VoiceRoom({ roomId, userId, displayName }: VoiceRoomProps) {
   const router = useRouter();
   const { participants, isMuted, isSoundMuted, isConnected, error, joinRoom, leaveRoom, toggleMute, toggleSoundMute } =
-    useWebRTC(roomId, userId);
+    useWebRTC(roomId, userId, displayName);
 
   useEffect(() => {
     joinRoom();
@@ -69,6 +70,7 @@ export function VoiceRoom({ roomId, userId }: VoiceRoomProps) {
           <ParticipantList
             participants={participants}
             localUserId={userId}
+            localDisplayName={displayName}
             localIsMuted={isMuted}
           />
         </div>

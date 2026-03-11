@@ -10,7 +10,7 @@ const ICE_SERVERS: RTCConfiguration = {
   ],
 };
 
-export function useWebRTC(roomId: string, userId: string) {
+export function useWebRTC(roomId: string, userId: string, displayName: string) {
   const [participants, setParticipants] = useState<Map<string, Participant>>(new Map());
   const [isMuted, setIsMuted] = useState(false);
   const [isSoundMuted, setIsSoundMuted] = useState(false);
@@ -36,9 +36,11 @@ export function useWebRTC(roomId: string, userId: string) {
       const next = new Map<string, Participant>();
       members.forEach((m) => {
         if (m.clientId !== userId) {
+          const data = m.data as { isMuted?: boolean; displayName?: string } | null;
           next.set(m.clientId, {
             userId: m.clientId,
-            isMuted: (m.data as { isMuted?: boolean })?.isMuted ?? false,
+            displayName: data?.displayName ?? m.clientId,
+            isMuted: data?.isMuted ?? false,
             isSpeaking: false,
           });
         }
@@ -238,7 +240,7 @@ export function useWebRTC(roomId: string, userId: string) {
       });
 
       // Enter presence so others know we're here
-      await channel.presence.enter({ isMuted: false });
+      await channel.presence.enter({ isMuted: false, displayName });
 
       // Sync initial participant list
       await syncPresence();
@@ -288,7 +290,7 @@ export function useWebRTC(roomId: string, userId: string) {
       const muted = !audioTrack.enabled;
       setIsMuted(muted);
       // Update presence so others see mute state
-      channelRef.current?.presence.update({ isMuted: muted });
+      channelRef.current?.presence.update({ isMuted: muted, displayName });
     }
   }, []);
 

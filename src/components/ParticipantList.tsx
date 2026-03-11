@@ -5,12 +5,13 @@ import { Participant } from "@/types";
 interface ParticipantListProps {
   participants: Map<string, Participant>;
   localUserId: string;
+  localDisplayName: string;
   localIsMuted: boolean;
 }
 
-export function ParticipantList({ participants, localUserId, localIsMuted }: ParticipantListProps) {
+export function ParticipantList({ participants, localUserId, localDisplayName, localIsMuted }: ParticipantListProps) {
   const allParticipants: Participant[] = [
-    { userId: localUserId, isMuted: localIsMuted, isSpeaking: false },
+    { userId: localUserId, displayName: localDisplayName, isMuted: localIsMuted, isSpeaking: false },
     ...Array.from(participants.values()),
   ];
 
@@ -25,21 +26,21 @@ export function ParticipantList({ participants, localUserId, localIsMuted }: Par
             key={p.userId}
             className="flex items-center gap-3 rounded-xl bg-white/5 px-4 py-3 border border-white/10"
           >
-            {/* Avatar */}
+            {/* Avatar — first 2 chars of displayName */}
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-500 text-white text-sm font-bold shrink-0">
-              {p.userId.slice(0, 2).toUpperCase()}
+              {p.displayName.slice(0, 2).toUpperCase()}
             </div>
 
-            {/* Name */}
+            {/* Display name */}
             <span className="flex-1 text-sm text-white truncate">
-              {p.userId === localUserId ? `${p.userId} (You)` : p.userId}
+              {p.userId === localUserId ? `${p.displayName} (คุณ)` : p.displayName}
             </span>
 
             {/* Mute indicator */}
             {p.isMuted ? (
-              <span title="Muted" className="text-red-400 text-xs">🔇</span>
+              <span title="ปิดไมค์" className="text-red-400 text-xs">🔇</span>
             ) : (
-              <span title="Unmuted" className="text-green-400 text-xs">🎙️</span>
+              <span title="เปิดไมค์" className="text-green-400 text-xs">🎙️</span>
             )}
           </li>
         ))}
