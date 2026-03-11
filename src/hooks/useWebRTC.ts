@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import Ably from "ably";
 import { Participant, SignalMessage } from "@/types";
 
-export function useWebRTC(roomId: string, userId: string, displayName: string) {
+export function useWebRTC(roomId: string, userId: string, displayName: string, roomName: string = "") {
   const [participants, setParticipants] = useState<Map<string, Participant>>(new Map());
   const [isMuted, setIsMuted] = useState(false);
   const [isSoundMuted, setIsSoundMuted] = useState(false);
@@ -428,7 +428,7 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
       });
 
       // Enter presence so others know we're here
-      await channel.presence.enter({ isMuted: false, displayName });
+      await channel.presence.enter({ isMuted: false, displayName, roomName });
 
       // Sync initial participant list
       await syncPresence();
@@ -492,7 +492,7 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
 
       // Update presence & broadcast intent
       setIsScreenSharing(true);
-      channelRef.current?.presence.update({ isMuted: isMuted, displayName, isScreenSharing: true });
+      channelRef.current?.presence.update({ isMuted: isMuted, displayName, roomName, isScreenSharing: true });
       channelRef.current?.publish("signal", {
         type: "screen-share-start",
         from: userId,
@@ -539,7 +539,7 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
 
     setIsScreenSharing(false);
 
-    channelRef.current?.presence.update({ isMuted: isMuted, displayName, isScreenSharing: false });
+    channelRef.current?.presence.update({ isMuted: isMuted, displayName, roomName, isScreenSharing: false });
 
     channelRef.current?.publish("signal", {
       type: "screen-share-stop",
@@ -556,7 +556,7 @@ export function useWebRTC(roomId: string, userId: string, displayName: string) {
       const muted = !audioTrack.enabled;
       setIsMuted(muted);
       // Update presence so others see mute state (preserve isScreenSharing)
-      channelRef.current?.presence.update({ isMuted: muted, displayName, isScreenSharing });
+      channelRef.current?.presence.update({ isMuted: muted, displayName, roomName, isScreenSharing });
     }
   }, [displayName, isScreenSharing]);
 

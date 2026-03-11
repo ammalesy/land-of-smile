@@ -12,19 +12,34 @@ export default function Home() {
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const { rooms, loading, error, refresh } = useRooms();
 
+  // Create room modal state
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newRoomName, setNewRoomName] = useState("");
+
   const hasName = displayName.trim().length > 0;
+  const hasRoomName = newRoomName.trim().length > 0;
+
+  const handleOpenCreateModal = () => {
+    if (!hasName) return;
+    setNewRoomName("");
+    setShowCreateModal(true);
+  };
 
   const handleCreate = () => {
     const name = displayName.trim();
-    if (!name) return;
+    const rName = newRoomName.trim();
+    if (!name || !rName) return;
     const newRoomId = uuidv4().slice(0, 8);
-    router.push(`/room/${newRoomId}?name=${encodeURIComponent(name)}`);
+    setShowCreateModal(false);
+    router.push(`/room/${newRoomId}?name=${encodeURIComponent(name)}&roomName=${encodeURIComponent(rName)}`);
   };
 
   const handleJoin = () => {
     const name = displayName.trim();
     if (!name || !selectedRoomId) return;
-    router.push(`/room/${selectedRoomId}?name=${encodeURIComponent(name)}`);
+    const selectedRoom = rooms.find((r) => r.roomId === selectedRoomId);
+    const rName = selectedRoom?.roomName || selectedRoomId;
+    router.push(`/room/${selectedRoomId}?name=${encodeURIComponent(name)}&roomName=${encodeURIComponent(rName)}`);
   };
 
   return (
@@ -46,10 +61,57 @@ export default function Home() {
         <div className="black-hole" />
       </div>
 
+      {/* ── Create Room Modal ─────────────────────────── */}
+      {showCreateModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-title"
+        >
+          <div className="w-full max-w-sm rounded-2xl bg-gray-900 border border-white/10 p-6 space-y-5 shadow-2xl">
+            <h2 id="modal-title" className="text-lg font-bold text-white">🎙 สร้างห้องใหม่</h2>
+
+            <div className="space-y-2">
+              <label htmlFor="roomName" className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+                ชื่อห้อง
+              </label>
+              <input
+                id="roomName"
+                type="text"
+                value={newRoomName}
+                onChange={(e) => setNewRoomName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && hasRoomName && handleCreate()}
+                placeholder="เช่น ห้องนั่งเล่น, Team Alpha..."
+                maxLength={40}
+                autoFocus
+                className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="flex-1 rounded-xl border border-white/10 py-2.5 text-sm text-gray-400 hover:text-white hover:border-white/30 transition-all"
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={handleCreate}
+                disabled={!hasRoomName}
+                className="flex-1 rounded-xl bg-indigo-600 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                สร้างห้อง →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Create Room — top-right corner */}
       <div className="absolute top-5 right-5 z-10">
         <button
-          onClick={handleCreate}
+          onClick={handleOpenCreateModal}
           disabled={!hasName}
           aria-label="สร้างห้องใหม่"
           className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 active:scale-95 transition-all shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
@@ -146,7 +208,7 @@ export default function Home() {
                         }`}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        {/* Room ID + member count */}
+                        {/* Room name + member count */}
                         <div className="flex items-center gap-2 min-w-0">
                           {/* Radio button indicator */}
                           <span className={`shrink-0 flex items-center justify-center w-4 h-4 rounded-full border-2 transition-all
@@ -155,7 +217,10 @@ export default function Home() {
                               <span className="w-2 h-2 rounded-full bg-indigo-400 block" />
                             )}
                           </span>
-                          <span className="font-mono text-sm text-indigo-300 truncate">{room.roomId}</span>
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-white truncate">{room.roomName}</p>
+                            <p className="text-xs text-gray-500 font-mono">#{room.roomId}</p>
+                          </div>
                         </div>
                         <span className="shrink-0 text-xs text-gray-400">
                           👤 {room.memberCount}/7
@@ -190,7 +255,9 @@ export default function Home() {
           aria-label="เข้าร่วมห้องที่เลือก"
           className="w-full rounded-2xl bg-white/10 py-4 text-base font-semibold text-white hover:bg-white/20 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {selectedRoomId ? `เข้าร่วม ${selectedRoomId} →` : "เลือกห้องเพื่อเข้าร่วม"}
+          {selectedRoomId
+            ? `เข้าร่วม "${rooms.find((r) => r.roomId === selectedRoomId)?.roomName || selectedRoomId}" →`
+            : "เลือกห้องเพื่อเข้าร่วม"}
         </button>
 
       </div>

@@ -11,15 +11,16 @@ interface VoiceRoomProps {
   roomId: string;
   userId: string;
   displayName: string;
+  roomName: string;
 }
 
-export function VoiceRoom({ roomId, userId, displayName }: VoiceRoomProps) {
+export function VoiceRoom({ roomId, userId, displayName, roomName }: VoiceRoomProps) {
   const router = useRouter();
   const {
     participants, isMuted, isSoundMuted, isConnected, audioBlocked,
     error, joinRoom, leaveRoom, toggleMute, toggleSoundMute, unlockAudio,
     isScreenSharing, remoteScreenStream, startScreenShare, stopScreenShare,
-  } = useWebRTC(roomId, userId, displayName);
+  } = useWebRTC(roomId, userId, displayName, roomName);
 
   useEffect(() => {
     joinRoom();
@@ -110,8 +111,11 @@ export function VoiceRoom({ roomId, userId, displayName }: VoiceRoomProps) {
         {/* Header */}
         <div className="text-center space-y-1">
           <h1 className="text-2xl font-bold text-white">🎙 Land of Smile</h1>
-          <p className="text-sm text-gray-400">
-            Room: <span className="font-mono text-indigo-400">{roomId}</span>
+          {roomName && (
+            <p className="text-base font-semibold text-indigo-300">{roomName}</p>
+          )}
+          <p className="text-sm text-gray-500 font-mono">
+            #{roomId}
           </p>
           <div className="flex items-center justify-center gap-2 text-xs">
             <span

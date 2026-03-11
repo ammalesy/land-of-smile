@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 
 export interface RoomInfo {
   roomId: string;
+  roomName: string;
   memberCount: number;
   members: { displayName: string; isMuted: boolean; isScreenSharing: boolean }[];
 }
@@ -49,12 +50,16 @@ export async function GET() {
 
         if (!presenceResult.success || !Array.isArray(presenceResult.items)) return;
 
+        let roomName = "";
         const members = presenceResult.items.map((m: { data?: unknown; clientId?: string }) => {
           // data may be a JSON string or already an object depending on encoding
-          let parsed: { displayName?: string; isMuted?: boolean; isScreenSharing?: boolean } = {};
+          let parsed: { displayName?: string; isMuted?: boolean; isScreenSharing?: boolean; roomName?: string } = {};
           try {
             parsed = typeof m.data === "string" ? JSON.parse(m.data) : (m.data as typeof parsed ?? {});
           } catch { /* use empty defaults */ }
+
+          // Use roomName from first member that has it
+          if (!roomName && parsed.roomName) roomName = parsed.roomName;
 
           return {
             displayName: parsed.displayName ?? m.clientId ?? "Unknown",
@@ -64,7 +69,7 @@ export async function GET() {
         });
 
         if (members.length > 0) {
-          rooms.push({ roomId, memberCount: members.length, members });
+          rooms.push({ roomId, roomName: roomName || roomId, memberCount: members.length, members });
         }
       } catch {
         // Channel exists but presence unavailable — skip

@@ -13,10 +13,11 @@ interface RoomPageProps {
 function RoomContent({ roomId }: { roomId: string }) {
   const searchParams = useSearchParams();
   const displayName = searchParams.get("name")?.trim() || "ไม่ระบุชื่อ";
+  const roomName = searchParams.get("roomName")?.trim() || "";
   // useRef ensures userId never changes across re-renders
   const userIdRef = useRef<string>(`user-${uuidv4().slice(0, 6)}`);
 
-  return <VoiceRoom roomId={roomId} userId={userIdRef.current} displayName={displayName} />;
+  return <VoiceRoom roomId={roomId} userId={userIdRef.current} displayName={displayName} roomName={roomName} />;
 }
 
 export default function RoomPage({ params }: RoomPageProps) {
