@@ -1,36 +1,125 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 😊 Land of Smile
+
+Group voice chat web app — รองรับสูงสุด 7 คนต่อห้อง
+
+---
+
+## Tech Stack
+
+| | |
+|--|--|
+| **Framework** | Next.js 15 (App Router) |
+| **Language** | TypeScript |
+| **Styling** | Tailwind CSS |
+| **Real-time Signaling** | Ably (WebSocket) |
+| **Audio** | WebRTC (P2P mesh, native browser API) |
+| **Auth** | Cookie-based password protection |
+| **Deployment** | Vercel (auto-deploy from `main`) |
+
+---
+
+## Features
+
+- 🎙 **Voice chat** — P2P audio ผ่าน WebRTC, ไม่ผ่าน server
+- 👥 **Participant list** — แสดงชื่อและสถานะ mute ของทุกคน real-time
+- 🔇 **Mute microphone** — ปิด/เปิดไมค์ของตัวเอง
+- 🔊 **Mute sound** — ปิด/เปิดเสียงที่ได้ยินจากคนอื่น
+- 🔒 **Password protection** — ต้อง login ก่อนใช้งาน (cookie อยู่ 90 วัน)
+- 🏠 **Create & Join room** — สร้างห้องใหม่หรือเข้าห้องที่มีอยู่ด้วย Room ID
+
+---
+
+## Project Structure
+
+```
+src/
+├── app/
+│   ├── api/
+│   │   ├── ably-token/route.ts   # Ably Token Auth endpoint
+│   │   └── auth/login/route.ts  # Login / logout endpoint
+│   ├── login/page.tsx            # Login page
+│   ├── room/[roomId]/page.tsx    # Voice room page
+│   ├── layout.tsx
+│   └── page.tsx                  # Home — create/join room
+├── components/
+│   ├── VoiceRoom.tsx             # Main room UI
+│   ├── ParticipantList.tsx       # List of connected users
+│   └── AudioControls.tsx         # Mute / Mute Sound / Leave buttons
+├── hooks/
+│   └── useWebRTC.ts              # WebRTC + Ably signaling logic
+├── middleware.ts                  # Auth middleware (protects all routes)
+└── types/
+    └── index.ts                  # Shared TypeScript types
+```
+
+---
 
 ## Getting Started
 
-First, run the development server:
+### 1. Install dependencies
+
+```bash
+npm install
+```
+
+### 2. Set up environment variables
+
+สร้างไฟล์ `.env.local`:
+
+```bash
+# Ably API Key — https://ably.com
+ABLY_API_KEY=your_ably_api_key
+
+# App password for login page
+APP_PASSWORD=your_password
+```
+
+> **Ably API Key** ต้องมี capability: `voice-room:* → publish, subscribe, presence`
+
+### 3. Run dev server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+เปิด [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Environment Variables (Vercel)
 
-## Learn More
+ตั้งค่าใน **Vercel Dashboard → Settings → Environment Variables**:
 
-To learn more about Next.js, take a look at the following resources:
+| Variable | Description |
+|----------|-------------|
+| `ABLY_API_KEY` | Ably API Key พร้อม presence capability |
+| `APP_PASSWORD` | รหัสผ่านสำหรับ login |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## How It Works
 
-## Deploy on Vercel
+```
+User A                    Ably                    User B
+  │                         │                        │
+  │── presence.enter() ────►│◄─── presence.enter() ──│
+  │── publish("user-joined")►│                        │
+  │                         │──► handleSignal() ──────│
+  │◄──────────── WebRTC offer/answer/ICE ─────────────│
+  │                                                    │
+  └──────────── P2P Audio (ไม่ผ่าน server) ───────────┘
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Ably** ทำหน้าที่เป็น Signaling Server และ Presence
+- **WebRTC** ส่งเสียงโดยตรง P2P ระหว่าง browsers
+- **Participant list** อิงจาก Ably Presence (reliable ทุก browser)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## Deployment
+
+Push ไปที่ `main` branch → Vercel deploy อัตโนมัติ
+
+```bash
+git push origin main
+```
