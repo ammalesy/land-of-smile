@@ -93,7 +93,6 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div className="text-center space-y-2">
-          <p className="text-5xl">😊</p>
           <h1 className="text-3xl font-bold text-white">Land of Smile</h1>
           <p className="text-sm text-gray-400">กรุณาใส่รหัสผ่านเพื่อเข้าใช้งาน</p>
         </div>

@@ -28,10 +28,26 @@ export default function Home() {
   };
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center bg-gray-950 p-6">
+    <div className="relative flex min-h-screen flex-col items-center justify-center p-6">
+
+      {/* ── Galaxy Background ─────────────────────────── */}
+      <div className="galaxy-bg" aria-hidden="true">
+        {/* Star layers */}
+        <div className="stars-layer stars-tiny" />
+        <div className="stars-layer stars-medium" />
+        <div className="stars-layer stars-bright" />
+
+        {/* Shooting stars */}
+        <div className="shooting-star" />
+        <div className="shooting-star" />
+        <div className="shooting-star" />
+
+        {/* Black Hole — centred behind the main card */}
+        <div className="black-hole" />
+      </div>
 
       {/* Create Room — top-right corner */}
-      <div className="absolute top-5 right-5">
+      <div className="absolute top-5 right-5 z-10">
         <button
           onClick={handleCreate}
           disabled={!hasName}
@@ -42,11 +58,10 @@ export default function Home() {
         </button>
       </div>
 
-      <div className="w-full max-w-sm space-y-8 text-center">
+      <div className="relative z-10 w-full max-w-sm space-y-8 text-center">
 
         {/* Logo / Title */}
         <div className="space-y-2">
-          <p className="text-5xl">😊</p>
           <h1 className="text-3xl font-bold text-white">Land of Smile</h1>
           <p className="text-sm text-gray-400">Group Voice Chat — รองรับสูงสุด 7 คน</p>
         </div>
