@@ -37,7 +37,7 @@ export function ParticipantList({ participants, localUserId, localDisplayName, l
               <p className="text-sm text-white truncate">
                 {p.userId === localUserId ? `${p.displayName} (คุณ)` : p.displayName}
               </p>
-              <p className="text-[10px] text-gray-500 font-mono truncate">#{p.userId}</p>
+              <p className="text-[10px] text-gray-400 font-mono truncate">#{p.userId}</p>
             </div>
 
             {/* Mute indicator */}
