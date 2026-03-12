@@ -53,9 +53,6 @@ export default function Home() {
         <div className="stars-layer stars-bright" />
 
         {/* Shooting stars */}
-        <div className="shooting-star" />
-        <div className="shooting-star" />
-        <div className="shooting-star" />
 
         {/* Black Hole — centred behind the main card */}
         <div className="black-hole" />

@@ -80,9 +80,6 @@ export function VoiceRoom({ roomId, userId, displayName, roomName }: VoiceRoomPr
         <div className="stars-layer stars-tiny" />
         <div className="stars-layer stars-medium" />
         <div className="stars-layer stars-bright" />
-        <div className="shooting-star" />
-        <div className="shooting-star" />
-        <div className="shooting-star" />
         <div className="black-hole" />
       </div>
 
