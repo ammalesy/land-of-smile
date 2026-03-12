@@ -2,10 +2,12 @@
 
 import { useEffect } from "react";
 import { useWebRTC } from "@/hooks/useWebRTC";
+import { useDebugLog } from "@/hooks/useDebugLog";
 import { ParticipantList } from "@/components/ParticipantList";
 import { AudioControls } from "@/components/AudioControls";
 import { ScreenShareView } from "@/components/ScreenShareView";
-import { useRouter } from "next/navigation";
+import { DebugPanel } from "@/components/DebugPanel";
+import { useRouter, useSearchParams } from "next/navigation";
 
 interface VoiceRoomProps {
   roomId: string;
@@ -16,11 +18,16 @@ interface VoiceRoomProps {
 
 export function VoiceRoom({ roomId, userId, displayName, roomName }: VoiceRoomProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isDebug = searchParams.get("debug") === "true";
+
+  const { entries: debugEntries, addLog, clearLog } = useDebugLog();
+
   const {
     participants, isMuted, isSoundMuted, isConnected, audioBlocked,
     error, joinRoom, leaveRoom, toggleMute, toggleSoundMute, unlockAudio,
     isScreenSharing, remoteScreenStream, startScreenShare, stopScreenShare,
-  } = useWebRTC(roomId, userId, displayName, roomName);
+  } = useWebRTC(roomId, userId, displayName, roomName, isDebug ? addLog : undefined);
 
   useEffect(() => {
     joinRoom();
@@ -157,6 +164,9 @@ export function VoiceRoom({ roomId, userId, displayName, roomName }: VoiceRoomPr
           onToggleScreenShare={handleToggleScreenShare}
         />
       </div>
+
+      {/* Debug panel — visible only when ?debug=true */}
+      {isDebug && <DebugPanel entries={debugEntries} onClear={clearLog} />}
     </div>
   );
 }

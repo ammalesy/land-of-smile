@@ -21,3 +21,14 @@ export interface SignalMessage {
   to?: string;
   payload: RTCSessionDescriptionInit | RTCIceCandidateInit | Record<string, unknown>;
 }
+
+export type DebugLevel = "info" | "success" | "warn" | "error";
+export type DebugCategory = "ably" | "presence" | "signal" | "ice" | "webrtc" | "audio" | "screen";
+
+export interface DebugLogEntry {
+  id: number;
+  ts: Date;
+  level: DebugLevel;
+  category: DebugCategory;
+  message: string;
+}

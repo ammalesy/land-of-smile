@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Ably from "ably";
-import { Participant, SignalMessage } from "@/types";
+import { DebugCategory, DebugLevel, Participant, SignalMessage } from "@/types";
 
-export function useWebRTC(roomId: string, userId: string, displayName: string, roomName: string = "") {
+type LogFn = (level: DebugLevel, category: DebugCategory, message: string) => void;
+
+export function useWebRTC(roomId: string, userId: string, displayName: string, roomName: string = "", onLog?: LogFn) {
   const [participants, setParticipants] = useState<Map<string, Participant>>(new Map());
   const [isMuted, setIsMuted] = useState(false);
   const [isSoundMuted, setIsSoundMuted] = useState(false);
@@ -32,6 +34,13 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
   const reconnectPeerRef = useRef<(remoteUserId: string) => Promise<void>>(async () => {});
   const handlePresenceEnterRef = useRef<(remoteUserId: string) => Promise<void>>(async () => {});
 
+  // Debug logger — kept in a ref so callbacks never go stale
+  const onLogRef = useRef<LogFn | undefined>(onLog);
+  useEffect(() => { onLogRef.current = onLog; }, [onLog]);
+  const log = useCallback((level: DebugLevel, category: DebugCategory, message: string) => {
+    onLogRef.current?.(level, category, message);
+  }, []);
+
   // Update participants from Ably Presence — source of truth for who is in the room
   const syncPresence = useCallback(async () => {
     const channel = channelRef.current;
@@ -60,10 +69,12 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
       // Close existing connection if any to avoid duplicates
       const existing = peerConnectionsRef.current.get(remoteUserId);
       if (existing) {
+        log("warn", "webrtc", `Re-creating PC for ${remoteUserId} (closing existing)`);
         existing.close();
       }
 
       const pc = new RTCPeerConnection({ iceServers: iceServersRef.current });
+      log("info", "webrtc", `Created RTCPeerConnection for ${remoteUserId}`);
 
       // Add local tracks to peer connection
       localStreamRef.current?.getTracks().forEach((track) => {
@@ -74,6 +85,7 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
       pc.ontrack = (event) => {
         const [remoteStream] = event.streams;
         if (!remoteStream) return;
+        log("info", "audio", `ontrack fired for ${remoteUserId} — attaching audio stream`);
 
         let audioEl = remoteAudioRefs.current.get(remoteUserId);
         if (!audioEl) {
@@ -91,46 +103,52 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
 
         const playPromise = audioEl.play();
         if (playPromise !== undefined) {
-          playPromise.catch((err) => {
-            console.warn("[Audio] Autoplay blocked (likely iOS):", err);
-            // Signal to UI that user interaction is needed to unlock audio
-            setAudioBlocked(true);
-          });
+          playPromise
+            .then(() => log("success", "audio", `audio.play() OK for ${remoteUserId}`))
+            .catch((err) => {
+              console.warn("[Audio] Autoplay blocked (likely iOS):", err);
+              log("warn", "audio", `audio.play() blocked for ${remoteUserId}: ${err}`);
+              setAudioBlocked(true);
+            });
         }
       };
 
       // Send ICE candidates via Ably
       pc.onicecandidate = (event) => {
         if (event.candidate) {
+          log("info", "ice", `Sending ICE candidate to ${remoteUserId}: ${event.candidate.type ?? ""} ${event.candidate.address ?? ""}`);
           channelRef.current?.publish("signal", {
             type: "ice-candidate",
             from: userId,
             to: remoteUserId,
             payload: event.candidate.toJSON(),
           } as SignalMessage);
+        } else {
+          log("info", "ice", `ICE gathering complete for ${remoteUserId}`);
         }
       };
 
       pc.onconnectionstatechange = () => {
         const state = pc.connectionState;
+        const lvl: DebugLevel = state === "connected" ? "success" : state === "failed" ? "error" : "info";
+        log(lvl, "webrtc", `${remoteUserId} connectionState → ${state}`);
         console.log(`[WebRTC] ${remoteUserId} connectionState: ${state}`);
         if (state === "failed") {
           peerConnectionsRef.current.delete(remoteUserId);
           iceCandidateQueueRef.current.delete(remoteUserId);
-          // Deterministic offerer role on reconnect: higher userId always re-offers.
-          // This prevents glare (both offering) and deadlock (neither offering).
           if (userId > remoteUserId) {
+            log("warn", "webrtc", `Triggering reconnect to ${remoteUserId} (we are offerer)`);
             console.log(`[WebRTC] Reconnecting to ${remoteUserId} (offerer role)...`);
             reconnectPeerRef.current(remoteUserId);
           }
-          // Answerer side waits — it will handle the incoming offer from the offerer.
         }
-        // "disconnected" is transient and may self-recover; don't tear down yet.
       };
 
       // ICE disconnected is transient — give it 5s to recover before forcing a reconnect.
       pc.oniceconnectionstatechange = () => {
         const state = pc.iceConnectionState;
+        const lvl: DebugLevel = (state === "connected" || state === "completed") ? "success" : state === "failed" ? "error" : "info";
+        log(lvl, "ice", `${remoteUserId} iceConnectionState → ${state}`);
         console.log(`[WebRTC] ${remoteUserId} iceConnectionState: ${state}`);
         if (state === "disconnected") {
           setTimeout(() => {
@@ -140,6 +158,7 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
               (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed")
             ) {
               console.warn(`[WebRTC] ICE still disconnected for ${remoteUserId}, forcing reconnect...`);
+              log("warn", "ice", `ICE still disconnected after 5s for ${remoteUserId} — forcing reconnect`);
               peerConnectionsRef.current.delete(remoteUserId);
               iceCandidateQueueRef.current.delete(remoteUserId);
               if (userId > remoteUserId) {
@@ -153,7 +172,7 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
       peerConnectionsRef.current.set(remoteUserId, pc);
       return pc;
     },
-    [userId, syncPresence]
+    [userId, syncPresence, log]
   );
 
   const createScreenPeerConnection = useCallback(
@@ -197,6 +216,8 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
 
       pc.oniceconnectionstatechange = () => {
         const state = pc.iceConnectionState;
+        const lvl: DebugLevel = (state === "connected" || state === "completed") ? "success" : state === "failed" ? "error" : "info";
+        log(lvl, "screen", `${remoteUserId} screen iceConnectionState → ${state}`);
         console.log(`[ScreenShare] ${remoteUserId} iceConnectionState: ${state}`);
         if ((state === "connected" || state === "completed") && pendingStream && asReceiver) {
           setRemoteScreenStream({ peerId: remoteUserId, stream: pendingStream });
@@ -205,6 +226,8 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
 
       pc.onconnectionstatechange = () => {
         const state = pc.connectionState;
+        const lvl: DebugLevel = state === "connected" ? "success" : state === "failed" ? "error" : "info";
+        log(lvl, "screen", `${remoteUserId} screen connectionState → ${state}`);
         console.log(`[ScreenShare] ${remoteUserId} connectionState: ${state}`);
         if (state === "connected" && pendingStream && asReceiver) {
           setRemoteScreenStream({ peerId: remoteUserId, stream: pendingStream });
@@ -217,7 +240,7 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
       screenPeerConnectionsRef.current.set(remoteUserId, pc);
       return pc;
     },
-    [userId]
+    [userId, log]
   );
 
   const handleSignal = useCallback(
@@ -291,6 +314,7 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
       if (from === userId) return;
 
       console.log(`[Signal] received: ${type} from ${from}`);
+      log("info", "signal", `← ${type} from ${from}`);
 
       if (type === "user-joined") {
         // Screen share is sharer-driven (not gated by offerer role): always send a screen
@@ -313,8 +337,10 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
                 to: `screen:${from}`,
                 payload: screenOffer,
               } as SignalMessage);
+              log("success", "screen", `→ screen offer sent to ${from} (user-joined fallback)`);
             } catch (err) {
               console.error(`[ScreenShare] Failed to send screen offer to ${from}:`, err);
+              log("error", "screen", `Failed to send screen offer to ${from}: ${err}`);
             }
           }
         }
@@ -327,11 +353,15 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
           existingPc.connectionState !== "failed" &&
           existingPc.connectionState !== "closed"
         ) {
+          log("info", "signal", `user-joined from ${from} — audio PC already alive, skipping offer`);
           return;
         }
         // user-joined has no "to" field (broadcast), so all existing users receive it.
         // Use the same deterministic offerer rule: only the higher-userId side offers.
-        if (userId <= from) return;
+        if (userId <= from) {
+          log("info", "signal", `user-joined from ${from} — we are answerer, waiting for their offer`);
+          return;
+        }
         const pc = createPeerConnection(from);
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
@@ -341,14 +371,15 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
           to: from,
           payload: offer,
         } as SignalMessage);
+        log("success", "signal", `→ audio offer sent to ${from} (user-joined fallback)`);
       }
 
       if (type === "offer") {
         // We received an audio offer — create answer
         const pc = createPeerConnection(from);
         await pc.setRemoteDescription(new RTCSessionDescription(payload as RTCSessionDescriptionInit));
-        // Drain any ICE candidates that arrived before setRemoteDescription
         const queued = iceCandidateQueueRef.current.get(from) ?? [];
+        if (queued.length) log("info", "ice", `Draining ${queued.length} queued ICE candidate(s) for ${from}`);
         for (const c of queued) {
           try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch { /* ignore */ }
         }
@@ -362,18 +393,22 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
           to: from,
           payload: answer,
         } as SignalMessage);
+        log("success", "signal", `→ answer sent to ${from}`);
       }
 
       if (type === "answer") {
         const pc = peerConnectionsRef.current.get(from);
         if (pc && pc.signalingState !== "stable") {
           await pc.setRemoteDescription(new RTCSessionDescription(payload as RTCSessionDescriptionInit));
-          // Drain any ICE candidates that arrived before setRemoteDescription
           const queued = iceCandidateQueueRef.current.get(from) ?? [];
+          if (queued.length) log("info", "ice", `Draining ${queued.length} queued ICE candidate(s) for ${from}`);
           for (const c of queued) {
             try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch { /* ignore */ }
           }
           iceCandidateQueueRef.current.delete(from);
+          log("success", "signal", `answer from ${from} applied`);
+        } else {
+          log("warn", "signal", `answer from ${from} ignored — signalingState: ${pc?.signalingState ?? "no PC"}`);
         }
       }
 
@@ -382,14 +417,16 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
         if (pc && pc.remoteDescription) {
           try {
             await pc.addIceCandidate(new RTCIceCandidate(payload as RTCIceCandidateInit));
+            log("info", "ice", `ICE candidate from ${from} added`);
           } catch (e) {
             console.warn("[ICE] Failed to add candidate", e);
+            log("error", "ice", `Failed to add ICE candidate from ${from}: ${e}`);
           }
         } else {
-          // Queue candidate until setRemoteDescription completes
           const q = iceCandidateQueueRef.current.get(from) ?? [];
           q.push(payload as RTCIceCandidateInit);
           iceCandidateQueueRef.current.set(from, q);
+          log("warn", "ice", `ICE candidate from ${from} queued (remoteDescription not set yet), queue size: ${q.length}`);
         }
       }
 
@@ -428,7 +465,7 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
         syncPresence();
       }
     },
-    [userId, createPeerConnection, createScreenPeerConnection, syncPresence]
+    [userId, createPeerConnection, createScreenPeerConnection, syncPresence, log]
   );
 
   // Keep handleSignalRef up to date so channel.subscribe always calls latest version
@@ -441,6 +478,7 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
     async (remoteUserId: string) => {
       if (!channelRef.current) return;
       console.log(`[WebRTC] Sending reconnect offer to ${remoteUserId}`);
+      log("warn", "webrtc", `Sending reconnect offer to ${remoteUserId}`);
       const pc = createPeerConnection(remoteUserId);
       try {
         const offer = await pc.createOffer();
@@ -451,11 +489,13 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
           to: remoteUserId,
           payload: offer,
         } as SignalMessage);
+        log("success", "signal", `→ reconnect offer sent to ${remoteUserId}`);
       } catch (err) {
         console.error(`[WebRTC] Reconnect offer failed for ${remoteUserId}:`, err);
+        log("error", "webrtc", `Reconnect offer failed for ${remoteUserId}: ${err}`);
       }
     },
-    [userId, createPeerConnection]
+    [userId, createPeerConnection, log]
   );
 
   useEffect(() => {
@@ -470,6 +510,8 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
     async (remoteUserId: string) => {
       if (!localStreamRef.current) return;
       if (remoteUserId === userId) return;
+
+      log("info", "presence", `${remoteUserId} entered presence`);
 
       // Screen share: sharer always offers to the new peer regardless of userId ordering.
       if (screenStreamRef.current) {
@@ -489,14 +531,19 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
               to: `screen:${remoteUserId}`,
               payload: screenOffer,
             } as SignalMessage);
+            log("success", "screen", `→ screen offer sent to ${remoteUserId} (presence-driven)`);
           } catch (err) {
             console.error(`[ScreenShare] Presence-driven screen offer failed for ${remoteUserId}:`, err);
+            log("error", "screen", `Screen offer failed for ${remoteUserId}: ${err}`);
           }
         }
       }
 
       // Audio: only the higher-userId side offers; the other waits for the incoming offer.
-      if (userId <= remoteUserId) return;
+      if (userId <= remoteUserId) {
+        log("info", "webrtc", `${remoteUserId} entered — we are answerer, waiting for their audio offer`);
+        return;
+      }
       // Skip if we already have a live audio peer connection for this user.
       const existingPc = peerConnectionsRef.current.get(remoteUserId);
       if (
@@ -504,6 +551,7 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
         existingPc.connectionState !== "failed" &&
         existingPc.connectionState !== "closed"
       ) {
+        log("info", "webrtc", `${remoteUserId} entered — audio PC already alive (${existingPc.connectionState}), skipping offer`);
         return;
       }
       console.log(`[WebRTC] Presence-driven audio offer to ${remoteUserId}`);
@@ -517,11 +565,13 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
           to: remoteUserId,
           payload: offer,
         } as SignalMessage);
+        log("success", "signal", `→ audio offer sent to ${remoteUserId} (presence-driven)`);
       } catch (err) {
         console.error(`[WebRTC] Presence-driven audio offer failed for ${remoteUserId}:`, err);
+        log("error", "webrtc", `Audio offer failed for ${remoteUserId}: ${err}`);
       }
     },
-    [userId, createPeerConnection, createScreenPeerConnection]
+    [userId, createPeerConnection, createScreenPeerConnection, log]
   );
 
   useEffect(() => {
@@ -537,14 +587,19 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
           const { iceServers } = await iceRes.json();
           iceServersRef.current = iceServers;
           console.log("[ICE] Loaded", iceServers.length, "servers");
+          log("success", "ice", `Loaded ${iceServers.length} ICE server(s) from API`);
+        } else {
+          log("warn", "ice", `ICE servers API returned ${iceRes.status}, using STUN only`);
         }
-      } catch {
+      } catch (e) {
         console.warn("[ICE] Failed to fetch ICE servers, using STUN only");
+        log("warn", "ice", `Failed to fetch ICE servers: ${e}. Using STUN only.`);
       }
 
       // Get microphone access
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
       localStreamRef.current = stream;
+      log("success", "audio", `Microphone acquired (${stream.getAudioTracks().length} track(s))`);
 
       // Use authCallback instead of authUrl for full control — always returns a fresh token
       const ably = new Ably.Realtime({
@@ -564,11 +619,17 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
 
       ably.connection.on("connected", () => {
         console.log("[Ably] Connected");
+        log("success", "ably", "Ably connection established");
         setIsConnected(true);
       });
-      ably.connection.on("disconnected", () => setIsConnected(false));
+      ably.connection.on("disconnected", () => {
+        log("warn", "ably", "Ably connection disconnected");
+        setIsConnected(false);
+      });
       ably.connection.on("failed", (err) => {
-        setError(`Ably connection failed: ${err?.reason?.message ?? "unknown"}`);
+        const msg = err?.reason?.message ?? "unknown";
+        log("error", "ably", `Ably connection failed: ${msg}`);
+        setError(`Ably connection failed: ${msg}`);
       });
 
       // Single channel for both signaling and presence
@@ -578,52 +639,59 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
       // Explicitly wait for the Ably channel to be fully attached before any
       // presence/signal work — prevents offers arriving before we can receive them.
       await channel.attach();
+      log("success", "ably", `Channel voice-room:${roomId} attached`);
 
       // Subscribe to signals
       await channel.subscribe("signal", (msg) => {
         handleSignalRef.current(msg.data as SignalMessage);
       });
+      log("success", "ably", "Subscribed to signal messages");
 
       // Listen for presence changes (enter/leave/update) → sync participant list
       // and trigger WebRTC offer for new entrants (where we are the offerer).
       await channel.presence.subscribe(["enter", "leave", "update"], (member) => {
         syncPresence();
         if (member.action === "enter") {
+          log("info", "presence", `Presence event: ${member.clientId} entered`);
           handlePresenceEnterRef.current(member.clientId);
+        } else if (member.action === "leave") {
+          log("info", "presence", `Presence event: ${member.clientId} left`);
         }
       });
+      log("success", "ably", "Subscribed to presence events");
 
       // Enter presence so others know we're here.
-      // Existing users' presence.subscribe("enter") will fire and they will send
-      // us an offer if they are the offerer (higher userId).
       await channel.presence.enter({ isMuted: false, displayName, roomName });
+      log("success", "presence", `Entered presence as ${userId} (${displayName})`);
 
       // Sync the initial participant list.
       await syncPresence();
 
       // As the new joiner, initiate offers to all already-present members
-      // where WE are the offerer (higher userId). This covers the case where
-      // the existing user has a lower userId and would otherwise wait silently.
+      // where WE are the offerer (higher userId).
       const existingMembers = await channel.presence.get();
-      for (const member of existingMembers) {
-        if (member.clientId !== userId) {
-          await handlePresenceEnterRef.current(member.clientId);
-        }
+      const others = existingMembers.filter((m) => m.clientId !== userId);
+      log("info", "presence", `Found ${others.length} existing member(s): ${others.map((m) => m.clientId).join(", ") || "none"}`);
+      for (const member of others) {
+        await handlePresenceEnterRef.current(member.clientId);
       }
 
-      // Broadcast "user-joined" as a fallback for any peer whose presence
-      // callback fired before their handlePresenceEnter could run.
+      // Broadcast "user-joined" as a fallback.
       channel.publish("signal", {
         type: "user-joined",
         from: userId,
         payload: {},
       } as SignalMessage);
+      log("info", "signal", `→ broadcast user-joined`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to join room");
+      const msg = err instanceof Error ? err.message : "Failed to join room";
+      log("error", "ably", `joinRoom failed: ${msg}`);
+      setError(msg);
     }
-  }, [roomId, userId, syncPresence]);
+  }, [roomId, userId, displayName, roomName, syncPresence, log]);
 
   const leaveRoom = useCallback(() => {
+    log("info", "presence", `Leaving room ${roomId}`);
     // Stop screen share before leaving
     if (screenStreamRef.current) {
       screenStreamRef.current.getTracks().forEach((t) => t.stop());
@@ -657,7 +725,7 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
     ablyRef.current?.close();
     setIsConnected(false);
     setParticipants(new Map());
-  }, [userId]);
+  }, [userId, roomId, log]);
 
   const startScreenShare = useCallback(async () => {
     try {
@@ -681,6 +749,7 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
       // Send screen offer to every connected peer
       const peerIds = Array.from(peerConnectionsRef.current.keys());
       console.log("[ScreenShare] starting share, peers:", peerIds);
+      log("info", "screen", `Screen share started — sending offers to ${peerIds.length} peer(s): ${peerIds.join(", ") || "none"}`);
 
       for (const peerId of peerIds) {
         // Pass screenStream explicitly so addTrack is guaranteed even if ref timing is off
@@ -696,6 +765,7 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
           to: `screen:${peerId}`,
           payload: offer,
         } as SignalMessage);
+        log("success", "screen", `→ screen offer sent to ${peerId}`);
       }
 
       // Auto-stop when user ends share via OS dialog
@@ -710,6 +780,7 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
   }, [userId, displayName, isMuted, createScreenPeerConnection]);
 
   const stopScreenShare = useCallback(() => {
+    log("info", "screen", "Screen share stopped");
     screenStreamRef.current?.getTracks().forEach((t) => t.stop());
     screenStreamRef.current = null;
 
@@ -725,7 +796,7 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
       from: userId,
       payload: {},
     } as SignalMessage);
-  }, [userId, displayName, isMuted]);
+  }, [userId, displayName, isMuted, log]);
 
   const toggleMute = useCallback(() => {
     if (!localStreamRef.current) return;
