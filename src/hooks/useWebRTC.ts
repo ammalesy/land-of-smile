@@ -171,11 +171,15 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
         console.log("[ScreenShare] addTrack called, tracks:", sourceStream.getTracks().length);
       }
 
-      // Receiver: show incoming video stream
+      // Receiver: buffer incoming stream and only surface it once ICE is connected
+      let pendingStream: MediaStream | null = null;
       pc.ontrack = (event) => {
-        const [stream] = event.streams;
-        if (stream) {
-          setRemoteScreenStream({ peerId: remoteUserId, stream });
+        const [incomingStream] = event.streams;
+        if (!incomingStream) return;
+        pendingStream = incomingStream;
+        // If already connected (e.g. fast local network), show immediately
+        if (pc.connectionState === "connected" || pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
+          setRemoteScreenStream({ peerId: remoteUserId, stream: incomingStream });
         }
       };
 
@@ -190,8 +194,21 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
         }
       };
 
+      pc.oniceconnectionstatechange = () => {
+        const state = pc.iceConnectionState;
+        console.log(`[ScreenShare] ${remoteUserId} iceConnectionState: ${state}`);
+        if ((state === "connected" || state === "completed") && pendingStream && asReceiver) {
+          setRemoteScreenStream({ peerId: remoteUserId, stream: pendingStream });
+        }
+      };
+
       pc.onconnectionstatechange = () => {
-        if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
+        const state = pc.connectionState;
+        console.log(`[ScreenShare] ${remoteUserId} connectionState: ${state}`);
+        if (state === "connected" && pendingStream && asReceiver) {
+          setRemoteScreenStream({ peerId: remoteUserId, stream: pendingStream });
+        }
+        if (state === "disconnected" || state === "failed") {
           screenPeerConnectionsRef.current.delete(remoteUserId);
         }
       };
