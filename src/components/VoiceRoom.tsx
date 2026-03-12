@@ -150,6 +150,7 @@ export function VoiceRoom({ roomId, userId, displayName, roomName }: VoiceRoomPr
           isSoundMuted={isSoundMuted}
           isConnected={isConnected}
           isScreenSharing={isScreenSharing}
+          someoneElseIsScreenSharing={!!remoteScreenStream}
           onToggleMute={toggleMute}
           onToggleSoundMute={toggleSoundMute}
           onLeave={handleLeave}

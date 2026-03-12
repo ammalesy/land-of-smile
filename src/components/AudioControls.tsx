@@ -5,6 +5,8 @@ interface AudioControlsProps {
   isSoundMuted: boolean;
   isConnected: boolean;
   isScreenSharing: boolean;
+  /** True when a remote participant is currently sharing their screen */
+  someoneElseIsScreenSharing: boolean;
   onToggleMute: () => void;
   onToggleSoundMute: () => void;
   onLeave: () => void;
@@ -16,11 +18,15 @@ export function AudioControls({
   isSoundMuted,
   isConnected,
   isScreenSharing,
+  someoneElseIsScreenSharing,
   onToggleMute,
   onToggleSoundMute,
   onLeave,
   onToggleScreenShare,
 }: AudioControlsProps) {
+  // Hide screen share button when someone else is already sharing
+  const showScreenShareButton = isScreenSharing || !someoneElseIsScreenSharing;
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-center gap-4">
@@ -56,21 +62,23 @@ export function AudioControls({
           {isSoundMuted ? "🔈" : "🔊"}
         </button>
 
-        {/* Screen Share */}
-        <button
-          onClick={onToggleScreenShare}
-          disabled={!isConnected}
-          aria-label={isScreenSharing ? "หยุดแชร์หน้าจอ" : "แชร์หน้าจอ"}
-          title={isScreenSharing ? "หยุดแชร์หน้าจอ" : "แชร์หน้าจอ"}
-          className={`flex h-14 w-14 items-center justify-center rounded-full text-xl transition-all
-            ${isScreenSharing
-              ? "bg-indigo-500 hover:bg-indigo-400 text-white ring-2 ring-indigo-300"
-              : "bg-white/10 hover:bg-white/20 text-white"
-            }
-            disabled:opacity-40 disabled:cursor-not-allowed`}
-        >
-          🖥️
-        </button>
+        {/* Screen Share — hidden when someone else is already sharing */}
+        {showScreenShareButton && (
+          <button
+            onClick={onToggleScreenShare}
+            disabled={!isConnected}
+            aria-label={isScreenSharing ? "หยุดแชร์หน้าจอ" : "แชร์หน้าจอ"}
+            title={isScreenSharing ? "หยุดแชร์หน้าจอ" : "แชร์หน้าจอ"}
+            className={`flex h-14 w-14 items-center justify-center rounded-full text-xl transition-all
+              ${isScreenSharing
+                ? "bg-indigo-500 hover:bg-indigo-400 text-white ring-2 ring-indigo-300"
+                : "bg-white/10 hover:bg-white/20 text-white"
+              }
+              disabled:opacity-40 disabled:cursor-not-allowed`}
+          >
+            🖥️
+          </button>
+        )}
 
         {/* Leave Room */}
         <button
@@ -87,7 +95,9 @@ export function AudioControls({
       <div className="flex items-center justify-center gap-4 text-xs text-gray-500">
         <span className="w-14 text-center">{isMuted ? "ไมค์ปิด" : "ไมค์เปิด"}</span>
         <span className="w-14 text-center">{isSoundMuted ? "เสียงปิด" : "เสียงเปิด"}</span>
-        <span className="w-14 text-center">{isScreenSharing ? "แชร์อยู่" : "แชร์จอ"}</span>
+        {showScreenShareButton && (
+          <span className="w-14 text-center">{isScreenSharing ? "แชร์อยู่" : "แชร์จอ"}</span>
+        )}
         <span className="w-14 text-center">ออก</span>
       </div>
     </div>
