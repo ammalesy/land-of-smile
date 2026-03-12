@@ -27,8 +27,9 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
     { urls: "stun:stun.l.google.com:19302" },
   ]);
 
-  // Use ref for handleSignal to avoid stale closure in channel.subscribe
+  // Use refs for signal/reconnect handlers to avoid stale closures in callbacks
   const handleSignalRef = useRef<(message: SignalMessage) => Promise<void>>(async () => {});
+  const reconnectPeerRef = useRef<(remoteUserId: string) => Promise<void>>(async () => {});
 
   // Update participants from Ably Presence — source of truth for who is in the room
   const syncPresence = useCallback(async () => {
@@ -110,19 +111,41 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
       };
 
       pc.onconnectionstatechange = () => {
-        console.log(`[WebRTC] ${remoteUserId} connectionState: ${pc.connectionState}`);
-        if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
+        const state = pc.connectionState;
+        console.log(`[WebRTC] ${remoteUserId} connectionState: ${state}`);
+        if (state === "failed") {
           peerConnectionsRef.current.delete(remoteUserId);
-          syncPresence();
+          iceCandidateQueueRef.current.delete(remoteUserId);
+          // Deterministic offerer role on reconnect: higher userId always re-offers.
+          // This prevents glare (both offering) and deadlock (neither offering).
+          if (userId > remoteUserId) {
+            console.log(`[WebRTC] Reconnecting to ${remoteUserId} (offerer role)...`);
+            reconnectPeerRef.current(remoteUserId);
+          }
+          // Answerer side waits — it will handle the incoming offer from the offerer.
         }
+        // "disconnected" is transient and may self-recover; don't tear down yet.
       };
 
-      // Fallback: iceConnectionState is more reliable across browsers
+      // ICE disconnected is transient — give it 5s to recover before forcing a reconnect.
       pc.oniceconnectionstatechange = () => {
-        console.log(`[WebRTC] ${remoteUserId} iceConnectionState: ${pc.iceConnectionState}`);
-        if (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed") {
-          peerConnectionsRef.current.delete(remoteUserId);
-          syncPresence();
+        const state = pc.iceConnectionState;
+        console.log(`[WebRTC] ${remoteUserId} iceConnectionState: ${state}`);
+        if (state === "disconnected") {
+          setTimeout(() => {
+            const currentPc = peerConnectionsRef.current.get(remoteUserId);
+            if (
+              currentPc === pc &&
+              (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed")
+            ) {
+              console.warn(`[WebRTC] ICE still disconnected for ${remoteUserId}, forcing reconnect...`);
+              peerConnectionsRef.current.delete(remoteUserId);
+              iceCandidateQueueRef.current.delete(remoteUserId);
+              if (userId > remoteUserId) {
+                reconnectPeerRef.current(remoteUserId);
+              }
+            }
+          }, 5000);
         }
       };
 
@@ -369,6 +392,32 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
   useEffect(() => {
     handleSignalRef.current = handleSignal;
   }, [handleSignal]);
+
+  // Reconnects a specific peer by sending a fresh offer (offerer role only).
+  const reconnectPeer = useCallback(
+    async (remoteUserId: string) => {
+      if (!channelRef.current) return;
+      console.log(`[WebRTC] Sending reconnect offer to ${remoteUserId}`);
+      const pc = createPeerConnection(remoteUserId);
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        channelRef.current.publish("signal", {
+          type: "offer",
+          from: userId,
+          to: remoteUserId,
+          payload: offer,
+        } as SignalMessage);
+      } catch (err) {
+        console.error(`[WebRTC] Reconnect offer failed for ${remoteUserId}:`, err);
+      }
+    },
+    [userId, createPeerConnection]
+  );
+
+  useEffect(() => {
+    reconnectPeerRef.current = reconnectPeer;
+  }, [reconnectPeer]);
 
   const joinRoom = useCallback(async () => {
     try {
