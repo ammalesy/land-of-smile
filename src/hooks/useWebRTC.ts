@@ -27,9 +27,10 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
     { urls: "stun:stun.l.google.com:19302" },
   ]);
 
-  // Use refs for signal/reconnect handlers to avoid stale closures in callbacks
+  // Use refs for signal/reconnect/presence handlers to avoid stale closures in callbacks
   const handleSignalRef = useRef<(message: SignalMessage) => Promise<void>>(async () => {});
   const reconnectPeerRef = useRef<(remoteUserId: string) => Promise<void>>(async () => {});
+  const handlePresenceEnterRef = useRef<(remoteUserId: string) => Promise<void>>(async () => {});
 
   // Update participants from Ably Presence — source of truth for who is in the room
   const syncPresence = useCallback(async () => {
@@ -292,7 +293,45 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
       console.log(`[Signal] received: ${type} from ${from}`);
 
       if (type === "user-joined") {
-        // Someone joined — initiate audio offer (we are the existing user)
+        // Screen share is sharer-driven (not gated by offerer role): always send a screen
+        // offer to the new peer if we are currently sharing, regardless of userId ordering.
+        // Do this BEFORE the audio-offerer guard so we never skip it.
+        if (screenStreamRef.current) {
+          const existingScreenPc = screenPeerConnectionsRef.current.get(from);
+          const screenPcAlive =
+            existingScreenPc &&
+            existingScreenPc.connectionState !== "failed" &&
+            existingScreenPc.connectionState !== "closed";
+          if (!screenPcAlive) {
+            try {
+              const screenPc = createScreenPeerConnection(from, false, screenStreamRef.current);
+              const screenOffer = await screenPc.createOffer();
+              await screenPc.setLocalDescription(screenOffer);
+              channelRef.current?.publish("signal", {
+                type: "offer",
+                from: `screen:${userId}`,
+                to: `screen:${from}`,
+                payload: screenOffer,
+              } as SignalMessage);
+            } catch (err) {
+              console.error(`[ScreenShare] Failed to send screen offer to ${from}:`, err);
+            }
+          }
+        }
+
+        // Audio offer: backup path — presence-enter already handles this in most cases.
+        // Only proceed if no live audio peer connection exists yet for this user.
+        const existingPc = peerConnectionsRef.current.get(from);
+        if (
+          existingPc &&
+          existingPc.connectionState !== "failed" &&
+          existingPc.connectionState !== "closed"
+        ) {
+          return;
+        }
+        // user-joined has no "to" field (broadcast), so all existing users receive it.
+        // Use the same deterministic offerer rule: only the higher-userId side offers.
+        if (userId <= from) return;
         const pc = createPeerConnection(from);
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
@@ -302,19 +341,6 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
           to: from,
           payload: offer,
         } as SignalMessage);
-
-        // If we are currently screen sharing, send a screen offer to the new peer too
-        if (screenStreamRef.current) {
-          const screenPc = createScreenPeerConnection(from, false, screenStreamRef.current);
-          const screenOffer = await screenPc.createOffer();
-          await screenPc.setLocalDescription(screenOffer);
-          channelRef.current?.publish("signal", {
-            type: "offer",
-            from: `screen:${userId}`,
-            to: `screen:${from}`,
-            payload: screenOffer,
-          } as SignalMessage);
-        }
       }
 
       if (type === "offer") {
@@ -436,6 +462,72 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
     reconnectPeerRef.current = reconnectPeer;
   }, [reconnectPeer]);
 
+  // Handles a remote user entering presence:
+  // 1. Initiates a WebRTC audio offer if we are the offerer (higher userId).
+  // 2. Always sends a screen share offer if we are currently sharing
+  //    (screen share is sharer-driven, not gated by the audio offerer role).
+  const handlePresenceEnter = useCallback(
+    async (remoteUserId: string) => {
+      if (!localStreamRef.current) return;
+      if (remoteUserId === userId) return;
+
+      // Screen share: sharer always offers to the new peer regardless of userId ordering.
+      if (screenStreamRef.current) {
+        const existingScreenPc = screenPeerConnectionsRef.current.get(remoteUserId);
+        const screenPcAlive =
+          existingScreenPc &&
+          existingScreenPc.connectionState !== "failed" &&
+          existingScreenPc.connectionState !== "closed";
+        if (!screenPcAlive) {
+          try {
+            const screenPc = createScreenPeerConnection(remoteUserId, false, screenStreamRef.current);
+            const screenOffer = await screenPc.createOffer();
+            await screenPc.setLocalDescription(screenOffer);
+            channelRef.current?.publish("signal", {
+              type: "offer",
+              from: `screen:${userId}`,
+              to: `screen:${remoteUserId}`,
+              payload: screenOffer,
+            } as SignalMessage);
+          } catch (err) {
+            console.error(`[ScreenShare] Presence-driven screen offer failed for ${remoteUserId}:`, err);
+          }
+        }
+      }
+
+      // Audio: only the higher-userId side offers; the other waits for the incoming offer.
+      if (userId <= remoteUserId) return;
+      // Skip if we already have a live audio peer connection for this user.
+      const existingPc = peerConnectionsRef.current.get(remoteUserId);
+      if (
+        existingPc &&
+        existingPc.connectionState !== "failed" &&
+        existingPc.connectionState !== "closed"
+      ) {
+        return;
+      }
+      console.log(`[WebRTC] Presence-driven audio offer to ${remoteUserId}`);
+      const pc = createPeerConnection(remoteUserId);
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        channelRef.current?.publish("signal", {
+          type: "offer",
+          from: userId,
+          to: remoteUserId,
+          payload: offer,
+        } as SignalMessage);
+      } catch (err) {
+        console.error(`[WebRTC] Presence-driven audio offer failed for ${remoteUserId}:`, err);
+      }
+    },
+    [userId, createPeerConnection, createScreenPeerConnection]
+  );
+
+  useEffect(() => {
+    handlePresenceEnterRef.current = handlePresenceEnter;
+  }, [handlePresenceEnter]);
+
   const joinRoom = useCallback(async () => {
     try {
       // Fetch ICE servers (STUN + TURN) from API — keeps credentials server-side
@@ -483,23 +575,44 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
       const channel = ably.channels.get(`voice-room:${roomId}`);
       channelRef.current = channel;
 
-      // Listen for presence changes (enter/leave/update) → sync participant list
-      channel.presence.subscribe(["enter", "leave", "update"], () => {
-        syncPresence();
-      });
+      // Explicitly wait for the Ably channel to be fully attached before any
+      // presence/signal work — prevents offers arriving before we can receive them.
+      await channel.attach();
 
       // Subscribe to signals
       await channel.subscribe("signal", (msg) => {
         handleSignalRef.current(msg.data as SignalMessage);
       });
 
-      // Enter presence so others know we're here
+      // Listen for presence changes (enter/leave/update) → sync participant list
+      // and trigger WebRTC offer for new entrants (where we are the offerer).
+      await channel.presence.subscribe(["enter", "leave", "update"], (member) => {
+        syncPresence();
+        if (member.action === "enter") {
+          handlePresenceEnterRef.current(member.clientId);
+        }
+      });
+
+      // Enter presence so others know we're here.
+      // Existing users' presence.subscribe("enter") will fire and they will send
+      // us an offer if they are the offerer (higher userId).
       await channel.presence.enter({ isMuted: false, displayName, roomName });
 
-      // Sync initial participant list
+      // Sync the initial participant list.
       await syncPresence();
 
-      // Announce to existing users so they initiate WebRTC offers to us
+      // As the new joiner, initiate offers to all already-present members
+      // where WE are the offerer (higher userId). This covers the case where
+      // the existing user has a lower userId and would otherwise wait silently.
+      const existingMembers = await channel.presence.get();
+      for (const member of existingMembers) {
+        if (member.clientId !== userId) {
+          await handlePresenceEnterRef.current(member.clientId);
+        }
+      }
+
+      // Broadcast "user-joined" as a fallback for any peer whose presence
+      // callback fired before their handlePresenceEnter could run.
       channel.publish("signal", {
         type: "user-joined",
         from: userId,
