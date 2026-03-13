@@ -3,6 +3,45 @@
 :root {
   --background: #02010a;
   --foreground: #ededed;
+
+  /* ── Theme UI tokens (Galaxy defaults) ── */
+  --t-text-primary:           #ffffff;
+  --t-text-secondary:         #9ca3af;
+  --t-text-mono:              #6b7280;
+  --t-text-hint:              #4b5563;
+
+  --t-input-bg:               rgba(255,255,255,0.05);
+  --t-input-border:           rgba(255,255,255,0.10);
+  --t-input-text:             #ffffff;
+  --t-input-placeholder:      #6b7280;
+
+  --t-card-bg:                rgba(255,255,255,0.05);
+  --t-card-border:            rgba(255,255,255,0.10);
+
+  --t-btn-ghost-border:       rgba(255,255,255,0.10);
+  --t-btn-ghost-text:         #9ca3af;
+  --t-btn-ghost-hover-bg:     rgba(255,255,255,0.08);
+  --t-btn-ghost-hover-border: rgba(255,255,255,0.30);
+  --t-btn-ghost-hover-text:   #ffffff;
+
+  --t-btn-icon-bg:            rgba(255,255,255,0.10);
+  --t-btn-icon-hover-bg:      rgba(255,255,255,0.20);
+  --t-btn-icon-text:          #ffffff;
+
+  --t-participant-bg:         rgba(255,255,255,0.05);
+  --t-participant-border:     rgba(255,255,255,0.10);
+
+  --t-member-tag-bg:          rgba(255,255,255,0.10);
+  --t-member-tag-text:        #d1d5db;
+
+  --t-room-row-bg:            rgba(255,255,255,0.05);
+  --t-room-row-border:        rgba(255,255,255,0.10);
+  --t-room-row-hover-bg:      rgba(255,255,255,0.10);
+
+  --t-join-btn-bg:            rgba(255,255,255,0.10);
+  --t-join-btn-hover-bg:      rgba(255,255,255,0.20);
+
+  --t-ctrl-label:             #6b7280;
 }
 
 @theme inline {
@@ -225,3 +264,300 @@ body {
   50%  { opacity: 1;    }
   100% { opacity: 0.6;  }
 }
+
+/* ══════════════════════════════════════════════════════════
+   THEME SYSTEM — data-theme attribute on <html>
+   ══════════════════════════════════════════════════════════ */
+
+/* ── Theme: MSN ─────────────────────────────────────────── */
+
+[data-theme="msn"] {
+  --background: #d4e8f7;
+  --foreground: #1a2a3a;
+
+  --t-text-primary:           #0f2a50;
+  --t-text-secondary:         #2f5a8a;
+  --t-text-mono:              #3a6a9a;
+  --t-text-hint:              #5a8ab0;
+
+  --t-input-bg:               rgba(255,255,255,0.92);
+  --t-input-border:           rgba(20,100,190,0.35);
+  --t-input-text:             #0f2a50;
+  --t-input-placeholder:      #6090b8;
+
+  --t-card-bg:                rgba(255,255,255,0.78);
+  --t-card-border:            rgba(20,100,190,0.25);
+
+  --t-btn-ghost-border:       rgba(20,100,190,0.28);
+  --t-btn-ghost-text:         #2a5a8a;
+  --t-btn-ghost-hover-bg:     rgba(20,100,190,0.10);
+  --t-btn-ghost-hover-border: rgba(20,100,190,0.50);
+  --t-btn-ghost-hover-text:   #0f2a50;
+
+  --t-btn-icon-bg:            rgba(20,100,190,0.12);
+  --t-btn-icon-hover-bg:      rgba(20,100,190,0.22);
+  --t-btn-icon-text:          #0f2a50;
+
+  --t-participant-bg:         rgba(255,255,255,0.65);
+  --t-participant-border:     rgba(20,100,190,0.20);
+
+  --t-member-tag-bg:          rgba(20,100,190,0.12);
+  --t-member-tag-text:        #1a4a80;
+
+  --t-room-row-bg:            rgba(255,255,255,0.65);
+  --t-room-row-border:        rgba(20,100,190,0.22);
+  --t-room-row-hover-bg:      rgba(255,255,255,0.88);
+
+  --t-join-btn-bg:            rgba(20,100,190,0.14);
+  --t-join-btn-hover-bg:      rgba(20,100,190,0.26);
+
+  --t-ctrl-label:             #3a6a9a;
+}
+
+[data-theme="msn"] body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.msn-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background:
+    linear-gradient(160deg, #1e6ec8 0%, #4d97d8 30%, #7fcef4 60%, #c5e8fa 100%);
+}
+
+/* Subtle cloud/wave overlay */
+.msn-gradient {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 70% 50% at 20% 80%, rgba(255,255,255,0.25) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 40% at 80% 20%, rgba(255,255,255,0.20) 0%, transparent 65%),
+    radial-gradient(ellipse 60% 35% at 50% 50%, rgba(126,198,242,0.30) 0%, transparent 70%);
+  animation: msnDrift 20s ease-in-out infinite alternate;
+}
+
+@keyframes msnDrift {
+  0%   { transform: scale(1)    translate(0px,  0px); }
+  50%  { transform: scale(1.04) translate(-8px,  6px); }
+  100% { transform: scale(1.02) translate( 8px, -4px); }
+}
+
+/* Decorative butterfly watermark */
+.msn-butterfly {
+  position: absolute;
+  bottom: 10%;
+  right: 8%;
+  font-size: 7rem;
+  opacity: 0.08;
+  transform: rotate(-10deg);
+  animation: msnButterflyFloat 8s ease-in-out infinite alternate;
+  pointer-events: none;
+  user-select: none;
+}
+
+@keyframes msnButterflyFloat {
+  0%   { transform: rotate(-10deg) scale(1);    opacity: 0.08; }
+  100% { transform: rotate(-6deg)  scale(1.06); opacity: 0.12; }
+}
+
+/* MSN: override card / input colours via Tailwind-compatible vars */
+[data-theme="msn"] .theme-card {
+  background: rgba(255, 255, 255, 0.75);
+  border-color: rgba(30, 110, 200, 0.25);
+  backdrop-filter: blur(12px);
+  color: #1a2a3a;
+}
+
+/* ── Theme: Neon ─────────────────────────────────────────── */
+
+[data-theme="neon"] {
+  --background: #07000f;
+  --foreground: #e0ffe8;
+
+  --t-text-primary:           #d8ffdf;
+  --t-text-secondary:         #60c870;
+  --t-text-mono:              #3a9848;
+  --t-text-hint:              #2a6833;
+
+  --t-input-bg:               rgba(0,220,80,0.06);
+  --t-input-border:           rgba(0,220,80,0.22);
+  --t-input-text:             #d8ffdf;
+  --t-input-placeholder:      #3a9848;
+
+  --t-card-bg:                rgba(0,220,80,0.04);
+  --t-card-border:            rgba(0,220,80,0.18);
+
+  --t-btn-ghost-border:       rgba(0,220,80,0.22);
+  --t-btn-ghost-text:         #60c870;
+  --t-btn-ghost-hover-bg:     rgba(0,220,80,0.10);
+  --t-btn-ghost-hover-border: rgba(0,220,80,0.45);
+  --t-btn-ghost-hover-text:   #d8ffdf;
+
+  --t-btn-icon-bg:            rgba(0,220,80,0.10);
+  --t-btn-icon-hover-bg:      rgba(0,220,80,0.20);
+  --t-btn-icon-text:          #d8ffdf;
+
+  --t-participant-bg:         rgba(0,220,80,0.04);
+  --t-participant-border:     rgba(0,220,80,0.15);
+
+  --t-member-tag-bg:          rgba(0,220,80,0.10);
+  --t-member-tag-text:        #90e8a0;
+
+  --t-room-row-bg:            rgba(0,220,80,0.04);
+  --t-room-row-border:        rgba(0,220,80,0.15);
+  --t-room-row-hover-bg:      rgba(0,220,80,0.10);
+
+  --t-join-btn-bg:            rgba(0,220,80,0.10);
+  --t-join-btn-hover-bg:      rgba(0,220,80,0.20);
+
+  --t-ctrl-label:             #3a9848;
+}
+
+[data-theme="neon"] body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.neon-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 160% 120% at 50% 60%, #07000f 0%, #0d001f 50%, #000d07 100%);
+}
+
+/* Perspective grid */
+.neon-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0, 255, 100, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 100, 0.06) 1px, transparent 1px);
+  background-size: 44px 44px;
+  animation: neonGridPulse 4s ease-in-out infinite alternate;
+}
+
+@keyframes neonGridPulse {
+  0%   { opacity: 0.5; }
+  100% { opacity: 1;   }
+}
+
+/* Glowing orbs */
+.neon-glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  animation: neonOrb 8s ease-in-out infinite alternate;
+}
+
+.neon-glow-1 {
+  width: 320px;
+  height: 320px;
+  top: 10%;
+  left: -80px;
+  background: rgba(180, 0, 255, 0.25);
+  animation-delay: 0s;
+}
+
+.neon-glow-2 {
+  width: 280px;
+  height: 280px;
+  bottom: 5%;
+  right: -60px;
+  background: rgba(0, 255, 120, 0.20);
+  animation-delay: -4s;
+}
+
+@keyframes neonOrb {
+  0%   { transform: scale(1)    translate(0px,   0px); }
+  50%  { transform: scale(1.15) translate(20px, -15px); }
+  100% { transform: scale(0.95) translate(-10px, 10px); }
+}
+
+/* ── Theme: Sakura ───────────────────────────────────────── */
+
+[data-theme="sakura"] {
+  --background: #fff0f6;
+  --foreground: #4a2040;
+
+  --t-text-primary:           #3a0f28;
+  --t-text-secondary:         #7a3055;
+  --t-text-mono:              #8a4065;
+  --t-text-hint:              #b07090;
+
+  --t-input-bg:               rgba(255,255,255,0.92);
+  --t-input-border:           rgba(200,70,130,0.30);
+  --t-input-text:             #3a0f28;
+  --t-input-placeholder:      #b07090;
+
+  --t-card-bg:                rgba(255,255,255,0.75);
+  --t-card-border:            rgba(200,70,130,0.22);
+
+  --t-btn-ghost-border:       rgba(200,70,130,0.25);
+  --t-btn-ghost-text:         #7a3055;
+  --t-btn-ghost-hover-bg:     rgba(200,70,130,0.10);
+  --t-btn-ghost-hover-border: rgba(200,70,130,0.48);
+  --t-btn-ghost-hover-text:   #3a0f28;
+
+  --t-btn-icon-bg:            rgba(200,70,130,0.12);
+  --t-btn-icon-hover-bg:      rgba(200,70,130,0.22);
+  --t-btn-icon-text:          #3a0f28;
+
+  --t-participant-bg:         rgba(255,255,255,0.65);
+  --t-participant-border:     rgba(200,70,130,0.18);
+
+  --t-member-tag-bg:          rgba(200,70,130,0.10);
+  --t-member-tag-text:        #6a2048;
+
+  --t-room-row-bg:            rgba(255,255,255,0.65);
+  --t-room-row-border:        rgba(200,70,130,0.20);
+  --t-room-row-hover-bg:      rgba(255,255,255,0.88);
+
+  --t-join-btn-bg:            rgba(200,70,130,0.12);
+  --t-join-btn-hover-bg:      rgba(200,70,130,0.24);
+
+  --t-ctrl-label:             #8a4065;
+}
+
+[data-theme="sakura"] body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.sakura-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background:
+    linear-gradient(160deg, #fff0f6 0%, #ffd6e8 45%, #ffc2dd 100%);
+}
+
+/* Falling petals */
+.sakura-petal {
+  position: absolute;
+  font-size: 1.4rem;
+  opacity: 0.55;
+  animation: sakuraFall linear infinite;
+  pointer-events: none;
+  user-select: none;
+}
+
+.sakura-p1 { left:  8%; animation-duration: 12s; animation-delay:  0s;   top: -5%; }
+.sakura-p2 { left: 22%; animation-duration: 16s; animation-delay: -4s;   top: -5%; }
+.sakura-p3 { left: 41%; animation-duration: 10s; animation-delay: -2s;   top: -5%; }
+.sakura-p4 { left: 60%; animation-duration: 14s; animation-delay: -7s;   top: -5%; }
+.sakura-p5 { left: 76%; animation-duration: 11s; animation-delay: -1.5s; top: -5%; }
+.sakura-p6 { left: 90%; animation-duration: 18s; animation-delay: -5s;   top: -5%; }
+
+@keyframes sakuraFall {
+  0%   { transform: translateY(-60px) rotate(0deg)   translateX(0px);  opacity: 0;    }
+  10%  { opacity: 0.55; }
+  80%  { opacity: 0.45; }
+  100% { transform: translateY(105vh)  rotate(360deg) translateX(40px); opacity: 0;    }
+}
+

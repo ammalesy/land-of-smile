@@ -13,7 +13,8 @@ export type SignalType =
   | "user-joined"
   | "user-left"
   | "screen-share-start"
-  | "screen-share-stop";
+  | "screen-share-stop"
+  | "theme-change";
 
 export interface SignalMessage {
   type: SignalType;
@@ -32,3 +33,6 @@ export interface DebugLogEntry {
   category: DebugCategory;
   message: string;
 }
+
+// ── Themes ─────────────────────────────────────────────
+export type ThemeId = "galaxy" | "msn" | "neon" | "sakura";

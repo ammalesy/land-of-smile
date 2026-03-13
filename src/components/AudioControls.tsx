@@ -39,7 +39,7 @@ export function AudioControls({
           className={`flex h-14 w-14 items-center justify-center rounded-full text-xl transition-all
             ${isMuted
               ? "bg-red-500 hover:bg-red-400 text-white"
-              : "bg-white/10 hover:bg-white/20 text-white"
+              : "bg-[var(--t-btn-icon-bg)] hover:bg-[var(--t-btn-icon-hover-bg)] text-[var(--t-btn-icon-text)]"
             }
             disabled:opacity-40 disabled:cursor-not-allowed`}
         >
@@ -55,7 +55,7 @@ export function AudioControls({
           className={`flex h-14 w-14 items-center justify-center rounded-full text-xl transition-all
             ${isSoundMuted
               ? "bg-orange-500 hover:bg-orange-400 text-white"
-              : "bg-white/10 hover:bg-white/20 text-white"
+              : "bg-[var(--t-btn-icon-bg)] hover:bg-[var(--t-btn-icon-hover-bg)] text-[var(--t-btn-icon-text)]"
             }
             disabled:opacity-40 disabled:cursor-not-allowed`}
         >
@@ -72,7 +72,7 @@ export function AudioControls({
             className={`flex h-14 w-14 items-center justify-center rounded-full text-xl transition-all
               ${isScreenSharing
                 ? "bg-indigo-500 hover:bg-indigo-400 text-white ring-2 ring-indigo-300"
-                : "bg-white/10 hover:bg-white/20 text-white"
+                : "bg-[var(--t-btn-icon-bg)] hover:bg-[var(--t-btn-icon-hover-bg)] text-[var(--t-btn-icon-text)]"
               }
               disabled:opacity-40 disabled:cursor-not-allowed`}
           >
@@ -92,7 +92,7 @@ export function AudioControls({
       </div>
 
       {/* Labels */}
-      <div className="flex items-center justify-center gap-4 text-xs text-gray-500">
+      <div className="flex items-center justify-center gap-4 text-xs text-[var(--t-ctrl-label)]">
         <span className="w-14 text-center">{isMuted ? "ไมค์ปิด" : "ไมค์เปิด"}</span>
         <span className="w-14 text-center">{isSoundMuted ? "เสียงปิด" : "เสียงเปิด"}</span>
         {showScreenShareButton && (

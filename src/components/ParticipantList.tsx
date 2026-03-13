@@ -18,14 +18,14 @@ export function ParticipantList({ participants, localUserId, localDisplayName, l
 
   return (
     <div className="flex flex-col gap-3">
-      <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+      <h2 className="text-sm font-semibold text-[var(--t-text-secondary)] uppercase tracking-wider">
         Participants ({allParticipants.length}/7)
       </h2>
       <ul className="flex flex-col gap-2">
         {allParticipants.map((p) => (
           <li
             key={p.userId}
-            className="flex items-center gap-3 rounded-xl bg-white/5 px-4 py-3 border border-white/10"
+            className="flex items-center gap-3 rounded-xl bg-[var(--t-participant-bg)] px-4 py-3 border border-[var(--t-participant-border)]"
           >
             {/* Avatar — first 2 chars of displayName */}
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-500 text-white text-sm font-bold shrink-0">
@@ -34,10 +34,10 @@ export function ParticipantList({ participants, localUserId, localDisplayName, l
 
             {/* Display name + user id */}
             <div className="flex-1 min-w-0">
-              <p className="text-sm text-white truncate">
+              <p className="text-sm text-[var(--t-text-primary)] truncate">
                 {p.userId === localUserId ? `${p.displayName} (คุณ)` : p.displayName}
               </p>
-              <p className="text-[10px] text-gray-400 font-mono truncate">#{p.userId}</p>
+              <p className="text-[10px] text-[var(--t-text-mono)] font-mono truncate">#{p.userId}</p>
             </div>
 
             {/* Mute indicator */}

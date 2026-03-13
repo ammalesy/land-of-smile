@@ -1,25 +1,39 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { useDebugLog } from "@/hooks/useDebugLog";
 import { ParticipantList } from "@/components/ParticipantList";
 import { AudioControls } from "@/components/AudioControls";
 import { ScreenShareView } from "@/components/ScreenShareView";
 import { DebugPanel } from "@/components/DebugPanel";
+import { ThemeBackground } from "@/components/ThemeBackground";
+import { ThemeSelector } from "@/components/ThemeSelector";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTheme } from "@/context/ThemeContext";
+import type { ThemeId } from "@/types";
 
 interface VoiceRoomProps {
   roomId: string;
   userId: string;
   displayName: string;
   roomName: string;
+  initialTheme?: ThemeId;
 }
 
-export function VoiceRoom({ roomId, userId, displayName, roomName }: VoiceRoomProps) {
+export function VoiceRoom({ roomId, userId, displayName, roomName, initialTheme }: VoiceRoomProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isDebug = searchParams.get("debug") === "true";
+
+  const { theme, setTheme } = useTheme();
+  const [showThemeSelector, setShowThemeSelector] = useState(false);
+  const [themeBeforeOpen, setThemeBeforeOpen] = useState<ThemeId>("galaxy");
+
+  // Apply creator’s initial theme immediately on mount, only once
+  useEffect(() => {
+    if (initialTheme) setTheme(initialTheme);
+  }, []); // eslint-disable-line
 
   const { entries: debugEntries, addLog, clearLog } = useDebugLog();
 
@@ -27,7 +41,13 @@ export function VoiceRoom({ roomId, userId, displayName, roomName }: VoiceRoomPr
     participants, isMuted, isSoundMuted, isConnected, audioBlocked,
     error, joinRoom, leaveRoom, toggleMute, toggleSoundMute, unlockAudio,
     isScreenSharing, remoteScreenStream, startScreenShare, stopScreenShare,
-  } = useWebRTC(roomId, userId, displayName, roomName, isDebug ? addLog : undefined);
+    changeRoomTheme,
+  } = useWebRTC(
+    roomId, userId, displayName, roomName,
+    isDebug ? addLog : undefined,
+    initialTheme,   // creator’s initial theme — synced into presence on join
+    setTheme,       // called when a theme-change signal arrives from another user
+  );
 
   useEffect(() => {
     joinRoom();
@@ -46,6 +66,21 @@ export function VoiceRoom({ roomId, userId, displayName, roomName }: VoiceRoomPr
     }
   };
 
+  const handleOpenThemeSelector = () => {
+    setThemeBeforeOpen(theme);
+    setShowThemeSelector(true);
+  };
+
+  const handleThemeConfirm = () => {
+    changeRoomTheme(theme); // broadcast the currently-selected theme to everyone
+    setShowThemeSelector(false);
+  };
+
+  const handleThemeCancel = () => {
+    setTheme(themeBeforeOpen); // revert preview
+    setShowThemeSelector(false);
+  };
+
   // Find the display name of the remote sharer (if any)
   const remoteSharerName = remoteScreenStream
     ? participants.get(remoteScreenStream.peerId)?.displayName ?? remoteScreenStream.peerId
@@ -54,14 +89,7 @@ export function VoiceRoom({ roomId, userId, displayName, roomName }: VoiceRoomPr
   if (error) {
     return (
       <div className="relative flex min-h-screen items-center justify-center">
-        <div className="galaxy-bg" aria-hidden="true">
-          <div className="stars-layer stars-tiny" />
-          <div className="stars-layer stars-medium" />
-          <div className="stars-layer stars-bright" />
-          <div className="shooting-star" />
-          <div className="shooting-star" />
-          <div className="black-hole" />
-        </div>
+        <ThemeBackground />
         <div className="relative z-10 rounded-2xl bg-red-900/30 border border-red-500/30 p-8 text-center max-w-md">
           <p className="text-3xl mb-3">⚠️</p>
           <p className="text-red-400 font-semibold mb-2">เกิดข้อผิดพลาด</p>
@@ -82,12 +110,28 @@ export function VoiceRoom({ roomId, userId, displayName, roomName }: VoiceRoomPr
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center p-6">
 
-      {/* ── Galaxy Background ─────────────────────────── */}
-      <div className="galaxy-bg" aria-hidden="true">
-        <div className="stars-layer stars-tiny" />
-        <div className="stars-layer stars-medium" />
-        <div className="stars-layer stars-bright" />
-        <div className="black-hole" />
+      {/* ── Theme Background ─────────────────────────── */}
+      <ThemeBackground />
+
+      {/* ── In-room Theme Selector Popup ───────────── */}
+      {showThemeSelector && (
+        <ThemeSelector
+          mode="room"
+          onConfirm={handleThemeConfirm}
+          onCancel={handleThemeCancel}
+        />
+      )}
+
+      {/* ── Theme button — top-right corner ──────────── */}
+      <div className="absolute top-5 right-5 z-20">
+        <button
+          onClick={handleOpenThemeSelector}
+          aria-label="เปลี่ยน theme"
+          title="เปลี่ยน theme ของห้อง"
+          className="flex items-center gap-1.5 rounded-xl bg-[var(--t-btn-icon-bg)] hover:bg-[var(--t-btn-icon-hover-bg)] border border-[var(--t-card-border)] px-3 py-2 text-sm text-[var(--t-text-secondary)] hover:text-[var(--t-text-primary)] transition-all shadow-sm active:scale-95"
+        >
+          🎨 <span className="text-xs font-medium">Theme</span>
+        </button>
       </div>
 
       {/* Screen share — centered, user-resizable width */}
@@ -114,10 +158,10 @@ export function VoiceRoom({ roomId, userId, displayName, roomName }: VoiceRoomPr
 
         {/* Header */}
         <div className="text-center space-y-1">
-          <h1 className="text-2xl font-bold text-white">
+          <h1 className="text-2xl font-bold text-[var(--t-text-primary)]">
             {roomName || "ห้องสนทนา"}
           </h1>
-          <p className="text-xs text-gray-500 font-mono">
+          <p className="text-xs text-[var(--t-text-mono)] font-mono">
             #{roomId}
           </p>
           <div className="flex items-center justify-center gap-2 text-xs">
@@ -141,7 +185,7 @@ export function VoiceRoom({ roomId, userId, displayName, roomName }: VoiceRoomPr
         )}
 
         {/* Participants */}
-        <div className="rounded-2xl bg-white/5 border border-white/10 p-5">
+        <div className="rounded-2xl bg-[var(--t-card-bg)] border border-[var(--t-card-border)] p-5">
           <ParticipantList
             participants={participants}
             localUserId={userId}

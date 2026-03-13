@@ -5,7 +5,7 @@ This is the **Land of Smile** project.
 - Repository is hosted on **GitHub** (connected ✅)
 - Deployment is handled via **Vercel**, connected to this GitHub repository (connected ✅)
 - Every push to the `main` branch triggers an automatic deployment on Vercel.
-
+- Don't push automatic.
 ---
 
 ## Tech Stack

@@ -14,10 +14,11 @@ function RoomContent({ roomId }: { roomId: string }) {
   const searchParams = useSearchParams();
   const displayName = searchParams.get("name")?.trim() || "ไม่ระบุชื่อ";
   const roomName = searchParams.get("roomName")?.trim() || "";
+  const initialTheme = (searchParams.get("theme") ?? undefined) as import("@/types").ThemeId | undefined;
   // useRef ensures userId never changes across re-renders
   const userIdRef = useRef<string>(`user-${uuidv4().slice(0, 6)}`);
 
-  return <VoiceRoom roomId={roomId} userId={userIdRef.current} displayName={displayName} roomName={roomName} />;
+  return <VoiceRoom roomId={roomId} userId={userIdRef.current} displayName={displayName} roomName={roomName} initialTheme={initialTheme} />;
 }
 
 export default function RoomPage({ params }: RoomPageProps) {

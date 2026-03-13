@@ -1,10 +1,18 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Ably from "ably";
-import { DebugCategory, DebugLevel, Participant, SignalMessage } from "@/types";
+import { DebugCategory, DebugLevel, Participant, SignalMessage, ThemeId } from "@/types";
 
 type LogFn = (level: DebugLevel, category: DebugCategory, message: string) => void;
 
-export function useWebRTC(roomId: string, userId: string, displayName: string, roomName: string = "", onLog?: LogFn) {
+export function useWebRTC(
+  roomId: string,
+  userId: string,
+  displayName: string,
+  roomName: string = "",
+  onLog?: LogFn,
+  initialTheme?: ThemeId,
+  onThemeChange?: (themeId: ThemeId) => void,
+) {
   const [participants, setParticipants] = useState<Map<string, Participant>>(new Map());
   const [isMuted, setIsMuted] = useState(false);
   const [isSoundMuted, setIsSoundMuted] = useState(false);
@@ -34,6 +42,15 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
   const reconnectPeerRef = useRef<(remoteUserId: string) => Promise<void>>(async () => {});
   const handlePresenceEnterRef = useRef<(remoteUserId: string) => Promise<void>>(async () => {});
 
+  // Theme — keep current theme in a ref so presence.update always sends the latest value
+  const roomThemeRef = useRef<ThemeId>(initialTheme ?? "galaxy");
+  const onThemeChangeRef = useRef<((themeId: ThemeId) => void) | undefined>(onThemeChange);
+  useEffect(() => { onThemeChangeRef.current = onThemeChange; }, [onThemeChange]);
+  // Guard: only apply incoming room theme once per session (avoid overwriting creator's pick)
+  const hasAppliedRoomThemeRef = useRef(false);
+  // If we are the creator (initialTheme was passed), mark as already applied so we don't overwrite
+  useEffect(() => { if (initialTheme) hasAppliedRoomThemeRef.current = true; }, []);  // eslint-disable-line
+
   // Debug logger — kept in a ref so callbacks never go stale
   const onLogRef = useRef<LogFn | undefined>(onLog);
   useEffect(() => { onLogRef.current = onLog; }, [onLog]);
@@ -46,6 +63,18 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
     const channel = channelRef.current;
     if (!channel) return;
     const members = await channel.presence.get();
+    // Pick up room theme from any existing member (for late joiners)
+    if (!hasAppliedRoomThemeRef.current) {
+      const withTheme = members.find(
+        (m) => m.clientId !== userId && (m.data as { roomTheme?: ThemeId })?.roomTheme,
+      );
+      if (withTheme) {
+        const t = (withTheme.data as { roomTheme?: ThemeId }).roomTheme!;
+        hasAppliedRoomThemeRef.current = true;
+        roomThemeRef.current = t;
+        onThemeChangeRef.current?.(t);
+      }
+    }
     setParticipants(() => {
       const next = new Map<string, Participant>();
       members.forEach((m) => {
@@ -464,6 +493,14 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
         setRemoteScreenStream((prev) => (prev?.peerId === from ? null : prev));
         syncPresence();
       }
+
+      if (type === "theme-change") {
+        const { themeId } = payload as { themeId: ThemeId };
+        hasAppliedRoomThemeRef.current = true;
+        roomThemeRef.current = themeId;
+        onThemeChangeRef.current?.(themeId);
+        log("info", "signal", `← theme-change: ${themeId} from ${from}`);
+      }
     },
     [userId, createPeerConnection, createScreenPeerConnection, syncPresence, log]
   );
@@ -661,7 +698,7 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
       log("success", "ably", "Subscribed to presence events");
 
       // Enter presence so others know we're here.
-      await channel.presence.enter({ isMuted: false, displayName, roomName });
+      await channel.presence.enter({ isMuted: false, displayName, roomName, roomTheme: roomThemeRef.current });
       log("success", "presence", `Entered presence as ${userId} (${displayName})`);
 
       // Sync the initial participant list.
@@ -739,7 +776,7 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
 
       // Update presence & broadcast intent
       setIsScreenSharing(true);
-      channelRef.current?.presence.update({ isMuted: isMuted, displayName, roomName, isScreenSharing: true });
+      channelRef.current?.presence.update({ isMuted: isMuted, displayName, roomName, isScreenSharing: true, roomTheme: roomThemeRef.current });
       channelRef.current?.publish("signal", {
         type: "screen-share-start",
         from: userId,
@@ -789,7 +826,7 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
 
     setIsScreenSharing(false);
 
-    channelRef.current?.presence.update({ isMuted: isMuted, displayName, roomName, isScreenSharing: false });
+    channelRef.current?.presence.update({ isMuted: isMuted, displayName, roomName, isScreenSharing: false, roomTheme: roomThemeRef.current });
 
     channelRef.current?.publish("signal", {
       type: "screen-share-stop",
@@ -806,7 +843,7 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
       const muted = !audioTrack.enabled;
       setIsMuted(muted);
       // Update presence so others see mute state (preserve isScreenSharing)
-      channelRef.current?.presence.update({ isMuted: muted, displayName, roomName, isScreenSharing });
+      channelRef.current?.presence.update({ isMuted: muted, displayName, roomName, isScreenSharing, roomTheme: roomThemeRef.current });
     }
   }, [displayName, isScreenSharing]);
 
@@ -820,6 +857,28 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
       return next;
     });
   }, []);
+
+  const changeRoomTheme = useCallback(
+    (themeId: ThemeId) => {
+      roomThemeRef.current = themeId;
+      // Broadcast to everyone in the room
+      channelRef.current?.publish("signal", {
+        type: "theme-change",
+        from: userId,
+        payload: { themeId },
+      } as SignalMessage);
+      // Update own presence so late joiners get the latest theme
+      channelRef.current?.presence.update({
+        isMuted,
+        displayName,
+        roomName,
+        isScreenSharing,
+        roomTheme: themeId,
+      });
+      log("info", "signal", `→ theme-change broadcast: ${themeId}`);
+    },
+    [userId, isMuted, displayName, roomName, isScreenSharing, log],
+  );
 
   // Called from a user gesture (tap) to unlock audio on iOS Safari
   const unlockAudio = useCallback(() => {
@@ -853,5 +912,6 @@ export function useWebRTC(roomId: string, userId: string, displayName: string, r
     unlockAudio,
     startScreenShare,
     stopScreenShare,
+    changeRoomTheme,
   };
 }
