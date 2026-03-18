@@ -13,6 +13,7 @@ import { ChatBox } from "@/components/ChatBox";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTheme } from "@/context/ThemeContext";
 import type { ThemeId } from "@/types";
+import { playMessageSound } from "@/lib/notificationSound";
 
 interface VoiceRoomProps {
   roomId: string;
@@ -67,6 +68,7 @@ export function VoiceRoom({ roomId, userId, displayName, roomName, initialTheme 
     // Only bump unread count when the tab is not visible or not focused
     if (document.hidden || !document.hasFocus()) {
       setUnreadCount((n) => n + 1);
+      playMessageSound();
     }
   };
 
