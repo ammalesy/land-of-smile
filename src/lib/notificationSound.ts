@@ -24,7 +24,7 @@ export function playMessageSound(): void {
 
     // Volume envelope: soft attack → quick decay (total ~150 ms)
     gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.18, now + 0.015); // attack
+    gain.gain.linearRampToValueAtTime(0.55, now + 0.015); // attack
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15); // decay
 
     osc.start(now);
