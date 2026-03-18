@@ -87,7 +87,7 @@ export function ChatBox({ roomId, userId, displayName, onNewMessage }: ChatBoxPr
             <div
               className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm leading-snug break-words ${
                 msg.isSelf
-                  ? "bg-[var(--t-accent)] text-white rounded-br-sm"
+                  ? "bg-[var(--t-accent)] text-[var(--t-msg-self-text)] rounded-br-sm"
                   : "bg-[var(--t-card-border)]/30 text-[var(--t-text-primary)] border border-[var(--t-card-border)] rounded-bl-sm"
               }`}
             >
@@ -122,7 +122,7 @@ export function ChatBox({ roomId, userId, displayName, onNewMessage }: ChatBoxPr
             onClick={handleSend}
             disabled={!isReady || !inputValue.trim() || isSending}
             aria-label="ส่งข้อความ"
-            className="flex-shrink-0 rounded-xl bg-[var(--t-accent)] hover:opacity-90 disabled:opacity-40 px-3 py-2 text-sm text-white transition-all active:scale-95 disabled:cursor-not-allowed"
+            className="flex-shrink-0 rounded-xl bg-[var(--t-accent)] hover:opacity-90 disabled:opacity-40 px-3 py-2 text-sm text-[var(--t-msg-self-text)] transition-all active:scale-95 disabled:cursor-not-allowed"
           >
             ส่ง
           </button>

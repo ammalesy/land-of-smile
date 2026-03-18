@@ -42,6 +42,9 @@
   --t-join-btn-hover-bg:      rgba(255,255,255,0.20);
 
   --t-ctrl-label:             #6b7280;
+
+  --t-accent:                 #7c3aed;
+  --t-msg-self-text:          #ffffff;
 }
 
 @theme inline {
@@ -312,6 +315,9 @@ body {
   --t-join-btn-hover-bg:      rgba(20,100,190,0.26);
 
   --t-ctrl-label:             #3a6a9a;
+
+  --t-accent:                 #1e6ec8;
+  --t-msg-self-text:          #ffffff;
 }
 
 [data-theme="msn"] body {
@@ -414,6 +420,9 @@ body {
   --t-join-btn-hover-bg:      rgba(0,220,80,0.20);
 
   --t-ctrl-label:             #3a9848;
+
+  --t-accent:                 #00dc50;
+  --t-msg-self-text:          #042010;
 }
 
 [data-theme="neon"] body {
@@ -521,6 +530,9 @@ body {
   --t-join-btn-hover-bg:      rgba(200,70,130,0.24);
 
   --t-ctrl-label:             #8a4065;
+
+  --t-accent:                 #c84680;
+  --t-msg-self-text:          #ffffff;
 }
 
 [data-theme="sakura"] body {
