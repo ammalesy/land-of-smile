@@ -210,6 +210,7 @@ export function VoiceRoom({ roomId, userId, displayName, roomName, initialTheme 
               localUserId={userId}
               localDisplayName={displayName}
               localIsMuted={isMuted}
+              localIsSoundMuted={isSoundMuted}
               localIsScreenSharing={isScreenSharing}
             />
           </div>

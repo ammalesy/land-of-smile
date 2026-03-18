@@ -79,11 +79,12 @@ export function useWebRTC(
       const next = new Map<string, Participant>();
       members.forEach((m) => {
         if (m.clientId !== userId) {
-          const data = m.data as { isMuted?: boolean; displayName?: string; isScreenSharing?: boolean } | null;
+          const data = m.data as { isMuted?: boolean; isSoundMuted?: boolean; displayName?: string; isScreenSharing?: boolean } | null;
           next.set(m.clientId, {
             userId: m.clientId,
             displayName: data?.displayName ?? m.clientId,
             isMuted: data?.isMuted ?? false,
+            isSoundMuted: data?.isSoundMuted ?? false,
             isSpeaking: false,
             isScreenSharing: data?.isScreenSharing ?? false,
           });
@@ -698,7 +699,7 @@ export function useWebRTC(
       log("success", "ably", "Subscribed to presence events");
 
       // Enter presence so others know we're here.
-      await channel.presence.enter({ isMuted: false, displayName, roomName, roomTheme: roomThemeRef.current });
+      await channel.presence.enter({ isMuted: false, isSoundMuted: false, displayName, roomName, roomTheme: roomThemeRef.current });
       log("success", "presence", `Entered presence as ${userId} (${displayName})`);
 
       // Sync the initial participant list.
@@ -854,9 +855,18 @@ export function useWebRTC(
       remoteAudioRefs.current.forEach((audio) => {
         audio.muted = next;
       });
+      // Broadcast deafen state so others can see it
+      channelRef.current?.presence.update({
+        isMuted,
+        isSoundMuted: next,
+        displayName,
+        roomName,
+        isScreenSharing,
+        roomTheme: roomThemeRef.current,
+      });
       return next;
     });
-  }, []);
+  }, [isMuted, displayName, roomName, isScreenSharing]);
 
   const changeRoomTheme = useCallback(
     (themeId: ThemeId) => {

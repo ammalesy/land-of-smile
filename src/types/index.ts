@@ -2,6 +2,7 @@ export interface Participant {
   userId: string;
   displayName: string;
   isMuted: boolean;
+  isSoundMuted: boolean;
   isSpeaking: boolean;
   isScreenSharing: boolean;
 }
