@@ -237,16 +237,8 @@ export function VoiceRoom({ roomId, userId, displayName, roomName, initialTheme 
           style={{ height: "28rem" }}
           onClick={handleChatRead}
         >
-          <div className="px-4 py-2.5 border-b border-[var(--t-card-border)] flex items-center justify-between">
+          <div className="px-4 py-2.5 border-b border-[var(--t-card-border)] flex items-center">
             <span className="text-sm font-semibold text-[var(--t-text-primary)]">💬 Chat</span>
-            {unreadCount > 0 && (
-              <span
-                aria-label={`${unreadCount} ข้อความที่ยังไม่ได้อ่าน`}
-                className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none animate-bounce"
-              >
-                {unreadCount > 99 ? "99+" : unreadCount}
-              </span>
-            )}
           </div>
           <ChatBox
             roomId={roomId}

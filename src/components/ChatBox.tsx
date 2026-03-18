@@ -56,7 +56,7 @@ export function ChatBox({ roomId, userId, displayName, onNewMessage }: ChatBoxPr
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full min-h-0">
       {/* ── Message list ──────────────────────────────── */}
       <div className="flex-1 overflow-y-auto space-y-2 p-4 min-h-0">
         {!isReady && (
