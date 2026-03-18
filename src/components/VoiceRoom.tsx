@@ -175,11 +175,23 @@ export function VoiceRoom({ roomId, userId, displayName, roomName, initialTheme 
           </div>
         </div>
 
-        {/* Row: participants + chat */}
+        {/* Row: chat (left, wider) + participants (right, smaller) */}
         <div className="flex items-start justify-center gap-4 w-full">
 
-        {/* Left: voice card */}
-        <div className="flex-shrink-0 w-80 space-y-6">
+        {/* Left: chat panel — always visible */}
+        <div className="w-96 flex-shrink-0 rounded-2xl bg-[var(--t-card-bg)] border border-[var(--t-card-border)] overflow-hidden flex flex-col" style={{ height: "28rem" }}>
+          <div className="px-4 py-2.5 border-b border-[var(--t-card-border)]">
+            <span className="text-sm font-semibold text-[var(--t-text-primary)]">💬 Chat</span>
+          </div>
+          <ChatBox
+            roomId={roomId}
+            userId={userId}
+            displayName={displayName}
+          />
+        </div>
+
+        {/* Right: voice card */}
+        <div className="flex-shrink-0 w-80 flex flex-col gap-4">
 
           {/* iOS Safari audio unlock banner */}
           {audioBlocked && (
@@ -192,7 +204,7 @@ export function VoiceRoom({ roomId, userId, displayName, roomName, initialTheme 
           )}
 
           {/* Participants */}
-          <div className="rounded-2xl bg-[var(--t-card-bg)] border border-[var(--t-card-border)] p-5">
+          <div className="rounded-2xl bg-[var(--t-card-bg)] border border-[var(--t-card-border)] p-4">
             <ParticipantList
               participants={participants}
               localUserId={userId}
@@ -213,18 +225,6 @@ export function VoiceRoom({ roomId, userId, displayName, roomName, initialTheme 
             onToggleSoundMute={toggleSoundMute}
             onLeave={handleLeave}
             onToggleScreenShare={handleToggleScreenShare}
-          />
-        </div>
-
-        {/* Right: chat panel — always visible */}
-        <div className="w-64 flex-shrink-0 rounded-2xl bg-[var(--t-card-bg)] border border-[var(--t-card-border)] overflow-hidden flex flex-col" style={{ height: "28rem" }}>
-          <div className="px-4 py-2.5 border-b border-[var(--t-card-border)]">
-            <span className="text-sm font-semibold text-[var(--t-text-primary)]">💬 Chat</span>
-          </div>
-          <ChatBox
-            roomId={roomId}
-            userId={userId}
-            displayName={displayName}
           />
         </div>
 

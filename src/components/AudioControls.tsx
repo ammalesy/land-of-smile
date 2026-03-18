@@ -29,14 +29,14 @@ export function AudioControls({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-center gap-4">
+      <div className="flex items-center justify-center gap-3">
         {/* Mute Microphone */}
         <button
           onClick={onToggleMute}
           disabled={!isConnected}
           aria-label={isMuted ? "เปิดไมค์" : "ปิดไมค์"}
           title={isMuted ? "เปิดไมค์" : "ปิดไมค์"}
-          className={`flex h-14 w-14 items-center justify-center rounded-full text-xl transition-all
+          className={`flex flex-col items-center justify-center h-14 w-14 rounded-full text-xl transition-all
             ${isMuted
               ? "bg-red-500 hover:bg-red-400 text-white"
               : "bg-[var(--t-btn-icon-bg)] hover:bg-[var(--t-btn-icon-hover-bg)] text-[var(--t-btn-icon-text)]"
@@ -52,7 +52,7 @@ export function AudioControls({
           disabled={!isConnected}
           aria-label={isSoundMuted ? "เปิดเสียง" : "ปิดเสียง"}
           title={isSoundMuted ? "เปิดเสียง" : "ปิดเสียง"}
-          className={`flex h-14 w-14 items-center justify-center rounded-full text-xl transition-all
+          className={`flex flex-col items-center justify-center h-14 w-14 rounded-full text-xl transition-all
             ${isSoundMuted
               ? "bg-orange-500 hover:bg-orange-400 text-white"
               : "bg-[var(--t-btn-icon-bg)] hover:bg-[var(--t-btn-icon-hover-bg)] text-[var(--t-btn-icon-text)]"
@@ -69,7 +69,7 @@ export function AudioControls({
             disabled={!isConnected}
             aria-label={isScreenSharing ? "หยุดแชร์หน้าจอ" : "แชร์หน้าจอ"}
             title={isScreenSharing ? "หยุดแชร์หน้าจอ" : "แชร์หน้าจอ"}
-            className={`flex h-14 w-14 items-center justify-center rounded-full text-xl transition-all
+            className={`flex flex-col items-center justify-center h-14 w-14 rounded-full text-xl transition-all
               ${isScreenSharing
                 ? "bg-indigo-500 hover:bg-indigo-400 text-white ring-2 ring-indigo-300"
                 : "bg-[var(--t-btn-icon-bg)] hover:bg-[var(--t-btn-icon-hover-bg)] text-[var(--t-btn-icon-text)]"
@@ -85,14 +85,14 @@ export function AudioControls({
           onClick={onLeave}
           aria-label="ออกจากห้อง"
           title="ออกจากห้อง"
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-red-600 hover:bg-red-500 text-white text-xl transition-all"
+          className="flex flex-col items-center justify-center h-14 w-14 rounded-full bg-red-600 hover:bg-red-500 text-white text-xl transition-all"
         >
           📵
         </button>
       </div>
 
       {/* Labels */}
-      <div className="flex items-center justify-center gap-4 text-xs text-[var(--t-ctrl-label)]">
+      <div className="flex items-center justify-center gap-3 text-xs text-[var(--t-ctrl-label)]">
         <span className="w-14 text-center">{isMuted ? "ไมค์ปิด" : "ไมค์เปิด"}</span>
         <span className="w-14 text-center">{isSoundMuted ? "เสียงปิด" : "เสียงเปิด"}</span>
         {showScreenShareButton && (
@@ -103,4 +103,3 @@ export function AudioControls({
     </div>
   );
 }
-
