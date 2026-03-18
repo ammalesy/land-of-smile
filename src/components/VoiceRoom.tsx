@@ -123,7 +123,27 @@ export function VoiceRoom({ roomId, userId, displayName, roomName, initialTheme 
         />
       )}
 
-      {/* ── Theme button — top-right corner ──────────── */}
+      {/* ── Top-left: room info card ── */}
+      <div className="absolute top-5 left-5 z-20">
+        <div className="rounded-2xl bg-[var(--t-card-bg)] border border-[var(--t-card-border)] px-4 py-3 text-left shadow-sm space-y-0.5">
+          <h1 className="text-sm font-bold text-[var(--t-text-primary)] leading-tight">
+            {roomName || "ห้องสนทนา"}
+          </h1>
+          <p className="text-[10px] text-[var(--t-text-mono)] font-mono">
+            #{roomId}
+          </p>
+          <div className="flex items-center justify-start gap-1.5 pt-0.5">
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${isConnected ? "bg-green-400 animate-pulse" : "bg-yellow-400"}`}
+            />
+            <span className={`text-[10px] ${isConnected ? "text-green-400" : "text-yellow-400"}`}>
+              {isConnected ? "Connected" : "Connecting..."}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Top-right: theme button ──────────────── */}
       <div className="absolute top-5 right-5 z-20">
         <button
           onClick={handleOpenThemeSelector}
@@ -155,28 +175,10 @@ export function VoiceRoom({ roomId, userId, displayName, roomName, initialTheme 
       )}
 
       {/* ── Main content: voice card + chat side by side ── */}
-      <div className="relative z-10 flex items-start gap-4 w-full max-w-3xl">
+      <div className="relative z-10 flex items-start justify-center gap-4 w-full max-w-3xl">
 
         {/* Left: voice card */}
         <div className="flex-shrink-0 w-80 space-y-6">
-
-          {/* Header */}
-          <div className="text-center space-y-1">
-            <h1 className="text-2xl font-bold text-[var(--t-text-primary)]">
-              {roomName || "ห้องสนทนา"}
-            </h1>
-            <p className="text-xs text-[var(--t-text-mono)] font-mono">
-              #{roomId}
-            </p>
-            <div className="flex items-center justify-center gap-2 text-xs">
-              <span
-                className={`h-2 w-2 rounded-full ${isConnected ? "bg-green-400 animate-pulse" : "bg-yellow-400"}`}
-              />
-              <span className={isConnected ? "text-green-400" : "text-yellow-400"}>
-                {isConnected ? "Connected" : "Connecting..."}
-              </span>
-            </div>
-          </div>
 
           {/* iOS Safari audio unlock banner */}
           {audioBlocked && (
@@ -214,7 +216,7 @@ export function VoiceRoom({ roomId, userId, displayName, roomName, initialTheme 
         </div>
 
         {/* Right: chat panel — always visible */}
-        <div className="flex-1 rounded-2xl bg-[var(--t-card-bg)] border border-[var(--t-card-border)] overflow-hidden flex flex-col" style={{ height: "28rem" }}>
+        <div className="w-64 flex-shrink-0 rounded-2xl bg-[var(--t-card-bg)] border border-[var(--t-card-border)] overflow-hidden flex flex-col" style={{ height: "28rem" }}>
           <div className="px-4 py-2.5 border-b border-[var(--t-card-border)]">
             <span className="text-sm font-semibold text-[var(--t-text-primary)]">💬 Chat</span>
           </div>
