@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { useDebugLog } from "@/hooks/useDebugLog";
 import { ParticipantList } from "@/components/ParticipantList";
@@ -30,6 +30,47 @@ export function VoiceRoom({ roomId, userId, displayName, roomName, initialTheme 
   const { theme, setTheme } = useTheme();
   const [showThemeSelector, setShowThemeSelector] = useState(false);
   const [themeBeforeOpen, setThemeBeforeOpen] = useState<ThemeId>("galaxy");
+
+  // ── Unread message badge ──────────────────────────────────────
+  const [unreadCount, setUnreadCount] = useState(0);
+  const originalTitleRef = useRef<string>("");
+
+  // Save original title on mount
+  useEffect(() => {
+    originalTitleRef.current = document.title;
+  }, []);
+
+  // Sync document.title with unread count
+  useEffect(() => {
+    if (unreadCount > 0) {
+      document.title = `(${unreadCount}) ${roomName || "ห้องสนทนา"}`;
+    } else {
+      document.title = originalTitleRef.current;
+    }
+  }, [unreadCount, roomName]);
+
+  // Reset unread when tab becomes visible again
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) setUnreadCount(0);
+    };
+    const handleFocus = () => setUnreadCount(0);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, []);
+
+  const handleNewMessage = () => {
+    // Only bump unread count when the tab is not visible or not focused
+    if (document.hidden || !document.hasFocus()) {
+      setUnreadCount((n) => n + 1);
+    }
+  };
+
+  const handleChatRead = () => setUnreadCount(0);
 
   // Apply creator’s initial theme immediately on mount, only once
   useEffect(() => {
@@ -179,14 +220,27 @@ export function VoiceRoom({ roomId, userId, displayName, roomName, initialTheme 
         <div className="flex items-start justify-center gap-4 w-full">
 
         {/* Left: chat panel — always visible */}
-        <div className="w-96 flex-shrink-0 rounded-2xl bg-[var(--t-card-bg)] border border-[var(--t-card-border)] overflow-hidden flex flex-col" style={{ height: "28rem" }}>
-          <div className="px-4 py-2.5 border-b border-[var(--t-card-border)]">
+        <div
+          className="w-96 flex-shrink-0 rounded-2xl bg-[var(--t-card-bg)] border border-[var(--t-card-border)] overflow-hidden flex flex-col"
+          style={{ height: "28rem" }}
+          onClick={handleChatRead}
+        >
+          <div className="px-4 py-2.5 border-b border-[var(--t-card-border)] flex items-center justify-between">
             <span className="text-sm font-semibold text-[var(--t-text-primary)]">💬 Chat</span>
+            {unreadCount > 0 && (
+              <span
+                aria-label={`${unreadCount} ข้อความที่ยังไม่ได้อ่าน`}
+                className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none animate-bounce"
+              >
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
           </div>
           <ChatBox
             roomId={roomId}
             userId={userId}
             displayName={displayName}
+            onNewMessage={handleNewMessage}
           />
         </div>
 
