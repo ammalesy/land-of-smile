@@ -220,8 +220,18 @@ export function VoiceRoom({ roomId, userId, displayName, roomName, initialTheme 
         <div className="flex items-start justify-center gap-4 w-full">
 
         {/* Left: chat panel — always visible */}
+        <div className="relative w-96 flex-shrink-0">
+          {/* Corner badge — top-left of the chat box */}
+          {unreadCount > 0 && (
+            <span
+              aria-hidden="true"
+              className="absolute -top-2 -left-2 z-10 inline-flex items-center justify-center min-w-[1.35rem] h-[1.35rem] px-1.5 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none shadow-lg ring-2 ring-[var(--t-card-bg)] animate-bounce"
+            >
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+          )}
         <div
-          className="w-96 flex-shrink-0 rounded-2xl bg-[var(--t-card-bg)] border border-[var(--t-card-border)] overflow-hidden flex flex-col"
+          className="rounded-2xl bg-[var(--t-card-bg)] border border-[var(--t-card-border)] overflow-hidden flex flex-col"
           style={{ height: "28rem" }}
           onClick={handleChatRead}
         >
@@ -242,6 +252,7 @@ export function VoiceRoom({ roomId, userId, displayName, roomName, initialTheme 
             displayName={displayName}
             onNewMessage={handleNewMessage}
           />
+        </div>
         </div>
 
         {/* Right: voice card */}
