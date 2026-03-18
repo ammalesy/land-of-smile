@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { useDebugLog } from "@/hooks/useDebugLog";
 import { ParticipantList } from "@/components/ParticipantList";
@@ -9,6 +9,7 @@ import { ScreenShareView } from "@/components/ScreenShareView";
 import { DebugPanel } from "@/components/DebugPanel";
 import { ThemeBackground } from "@/components/ThemeBackground";
 import { ThemeSelector } from "@/components/ThemeSelector";
+import { ChatBox } from "@/components/ChatBox";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTheme } from "@/context/ThemeContext";
 import type { ThemeId } from "@/types";
@@ -29,6 +30,22 @@ export function VoiceRoom({ roomId, userId, displayName, roomName, initialTheme 
   const { theme, setTheme } = useTheme();
   const [showThemeSelector, setShowThemeSelector] = useState(false);
   const [themeBeforeOpen, setThemeBeforeOpen] = useState<ThemeId>("galaxy");
+
+  const [showChat, setShowChat] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const showChatRef = useRef(showChat);
+  useEffect(() => { showChatRef.current = showChat; }, [showChat]);
+
+  const handleNewMessage = useCallback(() => {
+    if (!showChatRef.current) setUnreadCount((n) => n + 1);
+  }, []);
+
+  const handleToggleChat = () => {
+    setShowChat((prev) => {
+      if (!prev) setUnreadCount(0);
+      return !prev;
+    });
+  };
 
   // Apply creator’s initial theme immediately on mount, only once
   useEffect(() => {
@@ -122,8 +139,24 @@ export function VoiceRoom({ roomId, userId, displayName, roomName, initialTheme 
         />
       )}
 
-      {/* ── Theme button — top-right corner ──────────── */}
-      <div className="absolute top-5 right-5 z-20">
+      {/* ── Top-right buttons (Theme + Chat) ─────────── */}
+      <div className="absolute top-5 right-5 z-20 flex items-center gap-2">
+        {/* Chat toggle */}
+        <button
+          onClick={handleToggleChat}
+          aria-label={showChat ? "ปิด chat" : "เปิด chat"}
+          title="Chat"
+          className="relative flex items-center gap-1.5 rounded-xl bg-[var(--t-btn-icon-bg)] hover:bg-[var(--t-btn-icon-hover-bg)] border border-[var(--t-card-border)] px-3 py-2 text-sm text-[var(--t-text-secondary)] hover:text-[var(--t-text-primary)] transition-all shadow-sm active:scale-95"
+        >
+          💬 <span className="text-xs font-medium">Chat</span>
+          {unreadCount > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
+        </button>
+
+        {/* Theme selector */}
         <button
           onClick={handleOpenThemeSelector}
           aria-label="เปลี่ยน theme"
@@ -208,6 +241,33 @@ export function VoiceRoom({ roomId, userId, displayName, roomName, initialTheme 
           onToggleScreenShare={handleToggleScreenShare}
         />
       </div>
+
+      {/* ── Chat panel ────────────────────────────────── */}
+      {showChat && (
+        <div className="relative z-10 w-full max-w-sm mt-4">
+          <div className="rounded-2xl bg-[var(--t-card-bg)] border border-[var(--t-card-border)] overflow-hidden flex flex-col" style={{ height: "22rem" }}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--t-card-border)]">
+              <span className="text-sm font-semibold text-[var(--t-text-primary)]">💬 Chat</span>
+              <button
+                onClick={handleToggleChat}
+                aria-label="ปิด chat"
+                className="text-[var(--t-text-secondary)] hover:text-[var(--t-text-primary)] transition-colors text-xs"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* ChatBox fills remaining height */}
+            <ChatBox
+              roomId={roomId}
+              userId={userId}
+              displayName={displayName}
+              onNewMessage={handleNewMessage}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Debug panel — visible only when ?debug=true */}
       {isDebug && <DebugPanel entries={debugEntries} onClear={clearLog} />}

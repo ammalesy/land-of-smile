@@ -17,6 +17,8 @@ export async function GET(request: Request) {
     clientId,
     capability: {
       "voice-room:*": ["publish", "subscribe", "presence"],
+      // Ably Chat SDK uses channels under the [chat] qualifier
+      "[chat]*": ["publish", "subscribe", "presence", "history", "annotation-publish", "annotation-subscribe"],
     },
   });
 
