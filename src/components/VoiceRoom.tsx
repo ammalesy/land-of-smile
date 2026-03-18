@@ -152,7 +152,7 @@ export function VoiceRoom({ roomId, userId, displayName, roomName, initialTheme 
   const hasScreenShare = isScreenSharing || !!remoteScreenStream;
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center p-6">
+    <div className="relative flex min-h-screen flex-col items-center justify-center px-4 py-6 pt-16 md:p-6">
 
       {/* ── Theme Background ─────────────────────────── */}
       <ThemeBackground />
@@ -167,7 +167,7 @@ export function VoiceRoom({ roomId, userId, displayName, roomName, initialTheme 
       )}
 
       {/* ── Top-right: theme button ──────────────── */}
-      <div className="absolute top-5 right-5 z-20">
+      <div className="absolute top-4 right-4 md:top-5 md:right-5 z-20">
         <button
           onClick={handleOpenThemeSelector}
           aria-label="เปลี่ยน theme"
@@ -180,7 +180,7 @@ export function VoiceRoom({ roomId, userId, displayName, roomName, initialTheme 
 
       {/* Screen share — centered, user-resizable width */}
       {(isScreenSharing || remoteScreenStream) && (
-        <div className="relative z-10 flex justify-center w-full mb-6">
+        <div className="relative z-10 flex justify-center w-full mb-4 md:mb-6">
           {isScreenSharing && (
             <ScreenShareView
               localStream={null}
@@ -202,7 +202,7 @@ export function VoiceRoom({ roomId, userId, displayName, roomName, initialTheme 
 
         {/* Header */}
         <div className="text-center space-y-1">
-          <h1 className="text-2xl font-bold text-[var(--t-text-primary)]">
+          <h1 className="text-xl md:text-2xl font-bold text-[var(--t-text-primary)]">
             {roomName || "ห้องสนทนา"}
           </h1>
           <p className="text-xs text-[var(--t-text-mono)] font-mono">
@@ -219,10 +219,10 @@ export function VoiceRoom({ roomId, userId, displayName, roomName, initialTheme 
         </div>
 
         {/* Row: chat (left, wider) + participants (right, smaller) */}
-        <div className="flex items-start justify-center gap-4 w-full">
+        <div className="flex flex-col md:flex-row items-stretch md:items-start justify-center gap-4 w-full">
 
         {/* Left: chat panel — always visible */}
-        <div className="relative w-96 flex-shrink-0">
+        <div className="relative order-2 md:order-1 w-full md:w-96 md:flex-shrink-0">
           {/* Corner badge — top-left of the chat box */}
           {unreadCount > 0 && (
             <span
@@ -233,8 +233,7 @@ export function VoiceRoom({ roomId, userId, displayName, roomName, initialTheme 
             </span>
           )}
         <div
-          className="rounded-2xl bg-[var(--t-card-bg)] border border-[var(--t-card-border)] overflow-hidden flex flex-col"
-          style={{ height: "28rem" }}
+          className="rounded-2xl bg-[var(--t-card-bg)] border border-[var(--t-card-border)] overflow-hidden flex flex-col h-64 sm:h-80 md:h-[28rem]"
           onClick={handleChatRead}
         >
           <div className="px-4 py-2.5 border-b border-[var(--t-card-border)] flex items-center">
@@ -250,7 +249,7 @@ export function VoiceRoom({ roomId, userId, displayName, roomName, initialTheme 
         </div>
 
         {/* Right: voice card */}
-        <div className="flex-shrink-0 w-80 flex flex-col gap-4">
+        <div className="order-1 md:order-2 w-full md:flex-shrink-0 md:w-80 flex flex-col gap-4">
 
           {/* iOS Safari audio unlock banner */}
           {audioBlocked && (
