@@ -46,9 +46,17 @@ export function ChatBox({ roomId, userId, displayName, onNewMessage }: ChatBoxPr
       await sendMessage(text);
     } finally {
       setIsSending(false);
-      inputRef.current?.focus();
     }
   };
+
+  // Focus input after sending completes (after React re-renders with disabled=false)
+  const wasSendingRef = useRef(false);
+  useEffect(() => {
+    if (wasSendingRef.current && !isSending) {
+      inputRef.current?.focus();
+    }
+    wasSendingRef.current = isSending;
+  }, [isSending]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
