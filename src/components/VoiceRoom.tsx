@@ -82,7 +82,7 @@ export function VoiceRoom({ roomId, userId, displayName, roomName, initialTheme 
   const { entries: debugEntries, addLog, clearLog } = useDebugLog();
 
   const {
-    participants, isMuted, isSoundMuted, isConnected, audioBlocked,
+    participants, peerConnectionStates, isMuted, isSoundMuted, isConnected, audioBlocked,
     error, joinRoom, leaveRoom, toggleMute, toggleSoundMute, unlockAudio,
     isScreenSharing, remoteScreenStream, startScreenShare, stopScreenShare,
     changeRoomTheme,
@@ -265,6 +265,7 @@ export function VoiceRoom({ roomId, userId, displayName, roomName, initialTheme 
           <div className="rounded-2xl bg-[var(--t-card-bg)] border border-[var(--t-card-border)] p-4">
             <ParticipantList
               participants={participants}
+              peerConnectionStates={peerConnectionStates}
               localUserId={userId}
               localDisplayName={displayName}
               localIsMuted={isMuted}

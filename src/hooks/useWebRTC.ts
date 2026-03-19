@@ -21,6 +21,7 @@ export function useWebRTC(
   const [error, setError] = useState<string | null>(null);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [remoteScreenStream, setRemoteScreenStream] = useState<{ peerId: string; stream: MediaStream } | null>(null);
+  const [peerConnectionStates, setPeerConnectionStates] = useState<Map<string, RTCPeerConnectionState>>(new Map());
 
   const ablyRef = useRef<Ably.Realtime | null>(null);
   // Single channel for both signaling AND presence
@@ -105,6 +106,7 @@ export function useWebRTC(
 
       const pc = new RTCPeerConnection({ iceServers: iceServersRef.current });
       log("info", "webrtc", `Created RTCPeerConnection for ${remoteUserId}`);
+      setPeerConnectionStates((prev) => { const next = new Map(prev); next.set(remoteUserId, "new"); return next; });
 
       // Add local tracks to peer connection
       localStreamRef.current?.getTracks().forEach((track) => {
@@ -163,6 +165,7 @@ export function useWebRTC(
         const lvl: DebugLevel = state === "connected" ? "success" : state === "failed" ? "error" : "info";
         log(lvl, "webrtc", `${remoteUserId} connectionState → ${state}`);
         console.log(`[WebRTC] ${remoteUserId} connectionState: ${state}`);
+        setPeerConnectionStates((prev) => { const next = new Map(prev); next.set(remoteUserId, state); return next; });
         if (state === "failed") {
           peerConnectionsRef.current.delete(remoteUserId);
           iceCandidateQueueRef.current.delete(remoteUserId);
@@ -465,6 +468,7 @@ export function useWebRTC(
         pc?.close();
         peerConnectionsRef.current.delete(from);
         iceCandidateQueueRef.current.delete(from);
+        setPeerConnectionStates((prev) => { const next = new Map(prev); next.delete(from); return next; });
         const audioEl = remoteAudioRefs.current.get(from);
         if (audioEl) {
           audioEl.srcObject = null;
@@ -908,6 +912,7 @@ export function useWebRTC(
 
   return {
     participants,
+    peerConnectionStates,
     isMuted,
     isSoundMuted,
     isConnected,

@@ -9,9 +9,10 @@ interface ParticipantListProps {
   localIsMuted: boolean;
   localIsSoundMuted: boolean;
   localIsScreenSharing: boolean;
+  peerConnectionStates?: Map<string, RTCPeerConnectionState>;
 }
 
-export function ParticipantList({ participants, localUserId, localDisplayName, localIsMuted, localIsSoundMuted, localIsScreenSharing }: ParticipantListProps) {
+export function ParticipantList({ participants, localUserId, localDisplayName, localIsMuted, localIsSoundMuted, localIsScreenSharing, peerConnectionStates }: ParticipantListProps) {
   const allParticipants: Participant[] = [
     { userId: localUserId, displayName: localDisplayName, isMuted: localIsMuted, isSoundMuted: localIsSoundMuted, isSpeaking: false, isScreenSharing: localIsScreenSharing },
     ...Array.from(participants.values()),
@@ -28,9 +29,18 @@ export function ParticipantList({ participants, localUserId, localDisplayName, l
             key={p.userId}
             className="flex items-center gap-3 rounded-xl bg-[var(--t-participant-bg)] px-4 py-3 border border-[var(--t-participant-border)]"
           >
-            {/* Avatar — first 2 chars of displayName */}
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-500 text-white text-sm font-bold shrink-0">
-              {p.displayName.slice(0, 2).toUpperCase()}
+            {/* Avatar — first 2 chars of displayName, with loading ring if connecting */}
+            <div className="relative shrink-0">
+              {p.userId !== localUserId && (() => {
+                const connState = peerConnectionStates?.get(p.userId);
+                const isConnecting = connState !== undefined && connState !== "connected" && connState !== "closed";
+                return isConnecting ? (
+                  <span className="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--t-accent)] animate-spin" aria-hidden="true" />
+                ) : null;
+              })()}
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-500 text-white text-sm font-bold">
+                {p.displayName.slice(0, 2).toUpperCase()}
+              </div>
             </div>
 
             {/* Display name + user id */}
