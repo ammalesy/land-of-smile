@@ -29,6 +29,7 @@ export function ChatBox({ roomId, userId, displayName, onNewMessage }: ChatBoxPr
   const [inputValue, setInputValue] = useState("");
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Auto-scroll to the latest message
   useEffect(() => {
@@ -45,6 +46,7 @@ export function ChatBox({ roomId, userId, displayName, onNewMessage }: ChatBoxPr
       await sendMessage(text);
     } finally {
       setIsSending(false);
+      inputRef.current?.focus();
     }
   };
 
@@ -109,6 +111,7 @@ export function ChatBox({ roomId, userId, displayName, onNewMessage }: ChatBoxPr
       <div className="px-3 pb-3 pt-2 border-t border-[var(--t-card-border)]">
         <div className="flex items-center gap-2">
           <input
+            ref={inputRef}
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
