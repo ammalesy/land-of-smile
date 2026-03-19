@@ -27,12 +27,11 @@ export default function Home() {
   const hasRoomName = newRoomName.trim().length > 0;
 
   const handleOpenCreateModal = () => {
-    if (!hasName) return;
     setNewRoomName("");
     setShowCreateModal(true);
   };
 
-  /** Step 1 of create: validate room name → open theme selector */
+  /** Step 1 of create: validate room name + display name → open theme selector */
   const handleCreateNext = () => {
     if (!hasName || !hasRoomName) return;
     setShowCreateModal(false);
@@ -94,17 +93,33 @@ export default function Home() {
 
             <div className="space-y-2">
               <label htmlFor="roomName" className="text-xs font-medium text-[var(--t-text-secondary)] uppercase tracking-wider">
-                ชื่อห้อง
+                ชื่อห้อง <span className="text-red-400">*</span>
               </label>
               <input
                 id="roomName"
                 type="text"
                 value={newRoomName}
                 onChange={(e) => setNewRoomName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && hasRoomName && handleCreateNext()}
+                onKeyDown={(e) => e.key === "Enter" && hasRoomName && hasName && handleCreateNext()}
                 placeholder="เช่น ห้องนั่งเล่น, Team Alpha..."
                 maxLength={40}
                 autoFocus
+                className="w-full rounded-xl bg-[var(--t-input-bg)] border border-[var(--t-input-border)] px-4 py-3 text-sm text-[var(--t-input-text)] placeholder:text-[var(--t-input-placeholder)] focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="modalDisplayName" className="text-xs font-medium text-[var(--t-text-secondary)] uppercase tracking-wider">
+                ชื่อที่แสดง <span className="text-red-400">*</span>
+              </label>
+              <input
+                id="modalDisplayName"
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && hasRoomName && hasName && handleCreateNext()}
+                placeholder="ใส่ชื่อของคุณ..."
+                maxLength={30}
                 className="w-full rounded-xl bg-[var(--t-input-bg)] border border-[var(--t-input-border)] px-4 py-3 text-sm text-[var(--t-input-text)] placeholder:text-[var(--t-input-placeholder)] focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
               />
             </div>
@@ -118,7 +133,7 @@ export default function Home() {
               </button>
               <button
                 onClick={handleCreateNext}
-                disabled={!hasRoomName}
+                disabled={!hasRoomName || !hasName}
                 className="flex-1 rounded-xl bg-indigo-600 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 ถัดไป →
@@ -132,9 +147,8 @@ export default function Home() {
       <div className="absolute top-5 right-5 z-10">
         <button
           onClick={handleOpenCreateModal}
-          disabled={!hasName}
           aria-label="สร้างห้องใหม่"
-          className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 active:scale-95 transition-all shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
+          className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 active:scale-95 transition-all shadow-lg"
         >
           🎙 สร้างห้องใหม่
         </button>
