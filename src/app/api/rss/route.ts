@@ -124,13 +124,14 @@ export async function GET(request: Request) {
         .map((room) => {
           const roomUrl = `${baseUrl}`;
           const description = `${room.memberCount} participant${room.memberCount !== 1 ? "s" : ""} online.`;
+          const pubDate = new Date(room.createdAt).toUTCString();
 
           return `<item>
       <title>${escapeXml(room.roomName)}</title>
       <link>${escapeXml(roomUrl)}</link>
       <guid isPermaLink="false">${escapeXml(room.roomId)}</guid>
       <description>${description}</description>
-      <pubDate>${buildDate}</pubDate>
+      <pubDate>${pubDate}</pubDate>
     </item>`;
         })
         .join("\n    ");
