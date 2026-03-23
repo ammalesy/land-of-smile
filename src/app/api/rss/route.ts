@@ -113,7 +113,7 @@ export async function GET(request: Request) {
       </item>`
     : rooms
         .map((room) => {
-          const roomUrl = `${baseUrl}/room/${encodeURIComponent(room.roomId)}`;
+          const roomUrl = `${baseUrl}`;
           const description = `${room.memberCount} participant${room.memberCount !== 1 ? "s" : ""} online.`;
 
           return `<item>
