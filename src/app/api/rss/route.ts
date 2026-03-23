@@ -3,18 +3,10 @@ import Ably from "ably";
 
 export const dynamic = "force-dynamic";
 
-interface RoomMember {
-  displayName: string;
-  isMuted: boolean;
-  isScreenSharing: boolean;
-}
-
 interface RoomInfo {
   roomId: string;
   roomName: string;
   memberCount: number;
-  members: RoomMember[];
-  discoveredAt: Date;
 }
 
 function escapeXml(str: string): string {
@@ -25,8 +17,6 @@ function escapeXml(str: string): string {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
 }
-
-
 
 async function fetchRooms(): Promise<RoomInfo[]> {
   const apiKey = process.env.ABLY_API_KEY;
@@ -59,44 +49,25 @@ async function fetchRooms(): Promise<RoomInfo[]> {
         );
 
         if (!presenceResult.success || !Array.isArray(presenceResult.items)) return;
+        if (presenceResult.items.length === 0) return;
 
+        // Extract roomName from first member that has it
         let roomName = "";
-        const members: RoomMember[] = presenceResult.items.map(
-          (m: { data?: unknown; clientId?: string }) => {
-            let parsed: {
-              displayName?: string;
-              isMuted?: boolean;
-              isScreenSharing?: boolean;
-              roomName?: string;
-            } = {};
-            try {
-              parsed =
-                typeof m.data === "string"
-                  ? JSON.parse(m.data)
-                  : ((m.data as typeof parsed) ?? {});
-            } catch {
-              /* use empty defaults */
-            }
-
-            if (!roomName && parsed.roomName) roomName = parsed.roomName;
-
-            return {
-              displayName: parsed.displayName ?? m.clientId ?? "Unknown",
-              isMuted: parsed.isMuted ?? false,
-              isScreenSharing: parsed.isScreenSharing ?? false,
-            };
-          }
-        );
-
-        if (members.length > 0) {
-          rooms.push({
-            roomId,
-            roomName: roomName || roomId,
-            memberCount: members.length,
-            members,
-            discoveredAt: new Date(),
-          });
+        for (const m of presenceResult.items as { data?: unknown }[]) {
+          try {
+            const parsed =
+              typeof m.data === "string"
+                ? JSON.parse(m.data)
+                : (m.data as { roomName?: string } ?? {});
+            if (parsed?.roomName) { roomName = parsed.roomName; break; }
+          } catch { /* skip */ }
         }
+
+        rooms.push({
+          roomId,
+          roomName: roomName || roomId,
+          memberCount: presenceResult.items.length,
+        });
       } catch {
         // Channel exists but presence unavailable — skip
       }
@@ -143,20 +114,7 @@ export async function GET(request: Request) {
     : rooms
         .map((room) => {
           const roomUrl = `${baseUrl}/room/${encodeURIComponent(room.roomId)}`;
-          const memberNames = room.members
-            .map((m) => escapeXml(m.displayName))
-            .join(", ");
-          const screenSharers = room.members.filter((m) => m.isScreenSharing);
-
-          const description = [
-            `${room.memberCount} participant${room.memberCount !== 1 ? "s" : ""} online.`,
-            memberNames ? `Members: ${memberNames}.` : "",
-            screenSharers.length > 0
-              ? `Screen sharing: ${screenSharers.map((m) => escapeXml(m.displayName)).join(", ")}.`
-              : "",
-          ]
-            .filter(Boolean)
-            .join(" ");
+          const description = `${room.memberCount} participant${room.memberCount !== 1 ? "s" : ""} online.`;
 
           return `<item>
       <title>${escapeXml(room.roomName)}</title>
