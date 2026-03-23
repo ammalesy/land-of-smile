@@ -91,6 +91,7 @@ export async function GET(request: Request) {
 
   try {
     rooms = await fetchRooms();
+    rooms = rooms.slice(0, 1); // show only the latest/top room
   } catch {
     fetchError = true;
   }
