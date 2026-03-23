@@ -26,6 +26,8 @@ function escapeXml(str: string): string {
     .replace(/'/g, "&apos;");
 }
 
+
+
 async function fetchRooms(): Promise<RoomInfo[]> {
   const apiKey = process.env.ABLY_API_KEY;
   if (!apiKey) throw new Error("Ably API key not configured");
