@@ -7,6 +7,7 @@ interface RoomInfo {
   roomId: string;
   roomName: string;
   memberCount: number;
+  createdAt: number; // epoch ms of earliest presence entry = room creation time
 }
 
 function escapeXml(str: string): string {
@@ -51,15 +52,20 @@ async function fetchRooms(): Promise<RoomInfo[]> {
         if (!presenceResult.success || !Array.isArray(presenceResult.items)) return;
         if (presenceResult.items.length === 0) return;
 
-        // Extract roomName from first member that has it
+        // Extract roomName and earliest timestamp from presence entries
         let roomName = "";
-        for (const m of presenceResult.items as { data?: unknown }[]) {
+        let earliestTs = Date.now();
+        for (const m of presenceResult.items as { data?: unknown; timestamp?: number }[]) {
+          // Track the earliest join time → room creation time
+          if (typeof m.timestamp === "number" && m.timestamp < earliestTs) {
+            earliestTs = m.timestamp;
+          }
           try {
             const parsed =
               typeof m.data === "string"
                 ? JSON.parse(m.data)
                 : (m.data as { roomName?: string } ?? {});
-            if (parsed?.roomName) { roomName = parsed.roomName; break; }
+            if (parsed?.roomName && !roomName) roomName = parsed.roomName;
           } catch { /* skip */ }
         }
 
@@ -67,6 +73,7 @@ async function fetchRooms(): Promise<RoomInfo[]> {
           roomId,
           roomName: roomName || roomId,
           memberCount: presenceResult.items.length,
+          createdAt: earliestTs,
         });
       } catch {
         // Channel exists but presence unavailable — skip
@@ -74,7 +81,8 @@ async function fetchRooms(): Promise<RoomInfo[]> {
     })
   );
 
-  rooms.sort((a, b) => b.memberCount - a.memberCount);
+  // Sort by createdAt descending → most recently created room first
+  rooms.sort((a, b) => b.createdAt - a.createdAt);
   return rooms;
 }
 
