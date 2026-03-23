@@ -108,18 +108,9 @@ export async function GET(request: Request) {
   const buildDate = now.toUTCString();
 
   const items = fetchError
-    ? `<item>
-        <title>Error fetching rooms</title>
-        <description>Could not retrieve room list at this time.</description>
-        <pubDate>${buildDate}</pubDate>
-      </item>`
+    ? `` // no items on error — Power Automate won't trigger
     : rooms.length === 0
-    ? `<item>
-        <title>No active rooms</title>
-        <description>There are currently no open rooms. Create one to get started!</description>
-        <link>${escapeXml(baseUrl)}</link>
-        <pubDate>${buildDate}</pubDate>
-      </item>`
+    ? `` // no items when no active rooms — Power Automate won't trigger
     : rooms
         .map((room) => {
           const roomUrl = `${baseUrl}`;
