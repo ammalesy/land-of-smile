@@ -3,6 +3,8 @@ import Ably from "ably";
 
 export const dynamic = "force-dynamic";
 
+const RSS_ENABLED = false;
+
 interface RoomInfo {
   roomId: string;
   roomName: string;
@@ -87,6 +89,10 @@ async function fetchRooms(): Promise<RoomInfo[]> {
 }
 
 export async function GET(request: Request) {
+  if (!RSS_ENABLED) {
+    return new NextResponse("RSS feed is disabled.", { status: 404 });
+  }
+
   const baseUrl =
     process.env.NEXT_PUBLIC_BASE_URL ??
     (() => {
