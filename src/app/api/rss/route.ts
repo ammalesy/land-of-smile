@@ -135,7 +135,7 @@ export async function GET(request: Request) {
     <description>Live list of currently open voice rooms on Land of Smile. Updated on every request.</description>
     <language>th</language>
     <lastBuildDate>${buildDate}</lastBuildDate>
-    <ttl>1</ttl>
+    <ttl>2</ttl>
     <atom:link href="${escapeXml(baseUrl)}/api/rss" rel="self" type="application/rss+xml"/>
     ${items}
   </channel>
