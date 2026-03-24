@@ -744,29 +744,42 @@ export function useWebRTC(
     setIsScreenSharing(false);
     setRemoteScreenStream(null);
 
-    channelRef.current?.publish("signal", {
-      type: "user-left",
-      from: userId,
-      payload: {},
-    } as SignalMessage);
+    const channel = channelRef.current;
+    const ably = ablyRef.current;
+    // Detach from refs immediately so nothing else touches them
+    channelRef.current = null;
+    ablyRef.current = null;
 
-    channelRef.current?.presence.leave();
+    // Only publish/leave if the channel is still attached and connection is live
+    const connState = ably?.connection.state;
+    const chanState = channel?.state;
+    const canPublish = connState === "connected" && chanState === "attached";
 
-    peerConnectionsRef.current.forEach((pc) => pc.close());
-    peerConnectionsRef.current.clear();
+    const cleanup = () => {
+      peerConnectionsRef.current.forEach((pc) => pc.close());
+      peerConnectionsRef.current.clear();
+      localStreamRef.current?.getTracks().forEach((t) => t.stop());
+      localStreamRef.current = null;
+      remoteAudioRefs.current.forEach((audio) => {
+        audio.srcObject = null;
+        audio.remove();
+      });
+      remoteAudioRefs.current.clear();
+      ably?.close();
+      setIsConnected(false);
+      setParticipants(new Map());
+    };
 
-    localStreamRef.current?.getTracks().forEach((t) => t.stop());
-    localStreamRef.current = null;
-
-    remoteAudioRefs.current.forEach((audio) => {
-      audio.srcObject = null;
-      audio.remove();
-    });
-    remoteAudioRefs.current.clear();
-
-    ablyRef.current?.close();
-    setIsConnected(false);
-    setParticipants(new Map());
+    if (canPublish && channel) {
+      // Await both signals before closing so Ably doesn't cut them off mid-flight
+      Promise.all([
+        channel.publish("signal", { type: "user-left", from: userId, payload: {} } as SignalMessage)
+          .catch(() => {}),
+        channel.presence.leave().catch(() => {}),
+      ]).finally(cleanup);
+    } else {
+      cleanup();
+    }
   }, [userId, roomId, log]);
 
   const startScreenShare = useCallback(async () => {
