@@ -175,53 +175,6 @@ export function useWebRTC(
           reconnectAttemptsRef.current.delete(remoteUserId);
         }
         if (state === "failed") {
-          // Diagnose failure reason via getStats() before cleaning up
-          pc.getStats().then((stats) => {
-            const localCands = new Map<string, RTCStats>();
-            const remoteCands = new Map<string, RTCStats>();
-            stats.forEach((r) => {
-              if (r.type === "local-candidate") localCands.set(r.id, r);
-              if (r.type === "remote-candidate") remoteCands.set(r.id, r);
-            });
-            const pairs: { state: string; local: RTCStats | undefined; remote: RTCStats | undefined }[] = [];
-            stats.forEach((r) => {
-              if (r.type === "candidate-pair") {
-                const p = r as RTCStats & { state: string; localCandidateId: string; remoteCandidateId: string };
-                pairs.push({
-                  state: p.state,
-                  local: localCands.get(p.localCandidateId),
-                  remote: remoteCands.get(p.remoteCandidateId),
-                });
-              }
-            });
-            console.group(`[WebRTC] ❌ connectionState: failed — ${remoteUserId}`);
-            console.log(`  iceConnectionState : ${pc.iceConnectionState}`);
-            console.log(`  iceGatheringState  : ${pc.iceGatheringState}`);
-            console.log(`  signalingState     : ${pc.signalingState}`);
-            if (pairs.length === 0) {
-              console.warn("  ⚠ No ICE candidate pairs — candidates may not have been gathered (NAT/firewall block or no TURN relay reached)");
-            } else {
-              console.log(`  ICE candidate pairs (${pairs.length}):`);
-              pairs.forEach(({ state: pairState, local, remote }) => {
-                const lc = local as unknown as Record<string, unknown> | undefined;
-                const rc = remote as unknown as Record<string, unknown> | undefined;
-                const lType = lc?.candidateType ?? "?";
-                const lAddr = lc?.address ?? "?";
-                const lPort = lc?.port ?? "?";
-                const rType = rc?.candidateType ?? "?";
-                const rAddr = rc?.address ?? "?";
-                const rPort = rc?.port ?? "?";
-                const icon = pairState === "succeeded" ? "✅" : pairState === "failed" ? "❌" : "⏳";
-                console.log(`    ${icon} [${pairState}] local:${lType}(${lAddr}:${lPort}) → remote:${rType}(${rAddr}:${rPort})`);
-              });
-              const allFailed = pairs.every((p) => p.state === "failed");
-              if (allFailed) {
-                console.warn("  ⚠ All candidate pairs failed — likely blocked NAT or unreachable TURN server");
-              }
-            }
-            console.groupEnd();
-          }).catch(() => {});
-
           peerConnectionsRef.current.delete(remoteUserId);
           iceCandidateQueueRef.current.delete(remoteUserId);
           if (userId > remoteUserId) {
