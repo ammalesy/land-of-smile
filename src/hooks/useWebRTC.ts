@@ -34,6 +34,10 @@ export function useWebRTC(
   // ICE candidate queues — holds candidates that arrive before setRemoteDescription completes
   const iceCandidateQueueRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const screenIceCandidateQueueRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
+  // Reconnect backoff — tracks per-peer attempt count and pending timers
+  const reconnectAttemptsRef = useRef<Map<string, number>>(new Map());
+  const reconnectTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const MAX_RECONNECT_ATTEMPTS = 5;
   const iceServersRef = useRef<RTCIceServer[]>([
     { urls: "stun:stun.l.google.com:19302" },
   ]);
@@ -166,6 +170,10 @@ export function useWebRTC(
         log(lvl, "webrtc", `${remoteUserId} connectionState → ${state}`);
         console.log(`[WebRTC] ${remoteUserId} connectionState: ${state}`);
         setPeerConnectionStates((prev) => { const next = new Map(prev); next.set(remoteUserId, state); return next; });
+        if (state === "connected") {
+          // Successful connection — reset backoff counter for this peer
+          reconnectAttemptsRef.current.delete(remoteUserId);
+        }
         if (state === "failed") {
           peerConnectionsRef.current.delete(remoteUserId);
           iceCandidateQueueRef.current.delete(remoteUserId);
@@ -464,6 +472,10 @@ export function useWebRTC(
       }
 
       if (type === "user-left") {
+        // Cancel any pending reconnect timer for this peer to avoid a ghost reconnect
+        const pendingTimer = reconnectTimersRef.current.get(from);
+        if (pendingTimer) { clearTimeout(pendingTimer); reconnectTimersRef.current.delete(from); }
+        reconnectAttemptsRef.current.delete(from);
         const pc = peerConnectionsRef.current.get(from);
         pc?.close();
         peerConnectionsRef.current.delete(from);
@@ -515,29 +527,58 @@ export function useWebRTC(
     handleSignalRef.current = handleSignal;
   }, [handleSignal]);
 
-  // Reconnects a specific peer by sending a fresh offer (offerer role only).
+  // Reconnects a specific peer with exponential backoff (offerer role only).
+  // Prevents infinite reconnect loops by capping at MAX_RECONNECT_ATTEMPTS.
   const reconnectPeer = useCallback(
     async (remoteUserId: string) => {
       if (!channelRef.current) return;
-      console.log(`[WebRTC] Sending reconnect offer to ${remoteUserId}`);
-      log("warn", "webrtc", `Sending reconnect offer to ${remoteUserId}`);
-      const pc = createPeerConnection(remoteUserId);
-      try {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        channelRef.current.publish("signal", {
-          type: "offer",
-          from: userId,
-          to: remoteUserId,
-          payload: offer,
-        } as SignalMessage);
-        log("success", "signal", `→ reconnect offer sent to ${remoteUserId}`);
-      } catch (err) {
-        console.error(`[WebRTC] Reconnect offer failed for ${remoteUserId}:`, err);
-        log("error", "webrtc", `Reconnect offer failed for ${remoteUserId}: ${err}`);
+
+      // If a reconnect is already scheduled for this peer, don't stack another one
+      if (reconnectTimersRef.current.has(remoteUserId)) {
+        log("info", "webrtc", `Reconnect for ${remoteUserId} already pending, skipping duplicate`);
+        return;
       }
+
+      const attempts = reconnectAttemptsRef.current.get(remoteUserId) ?? 0;
+      if (attempts >= MAX_RECONNECT_ATTEMPTS) {
+        console.warn(`[WebRTC] Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached for ${remoteUserId}, giving up`);
+        log("error", "webrtc", `Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached for ${remoteUserId} — giving up`);
+        return;
+      }
+
+      reconnectAttemptsRef.current.set(remoteUserId, attempts + 1);
+      // Exponential backoff: 1s, 2s, 4s, 8s, 16s (capped at 30s)
+      const delay = Math.min(30_000, Math.pow(2, attempts) * 1_000);
+
+      console.log(`[WebRTC] Reconnecting to ${remoteUserId} (attempt ${attempts + 1}/${MAX_RECONNECT_ATTEMPTS}) in ${delay}ms`);
+      log("warn", "webrtc", `Reconnect to ${remoteUserId} scheduled in ${delay}ms (attempt ${attempts + 1}/${MAX_RECONNECT_ATTEMPTS})`);
+
+      const timer = setTimeout(async () => {
+        reconnectTimersRef.current.delete(remoteUserId);
+        if (!channelRef.current) return;
+
+        console.log(`[WebRTC] Sending reconnect offer to ${remoteUserId}`);
+        log("warn", "webrtc", `Sending reconnect offer to ${remoteUserId}`);
+        const pc = createPeerConnection(remoteUserId);
+        try {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          channelRef.current.publish("signal", {
+            type: "offer",
+            from: userId,
+            to: remoteUserId,
+            payload: offer,
+          } as SignalMessage);
+          log("success", "signal", `→ reconnect offer sent to ${remoteUserId}`);
+        } catch (err) {
+          console.error(`[WebRTC] Reconnect offer failed for ${remoteUserId}:`, err);
+          log("error", "webrtc", `Reconnect offer failed for ${remoteUserId}: ${err}`);
+        }
+      }, delay);
+
+      reconnectTimersRef.current.set(remoteUserId, timer);
     },
-    [userId, createPeerConnection, log]
+    [userId, createPeerConnection, log, MAX_RECONNECT_ATTEMPTS]
   );
 
   useEffect(() => {
