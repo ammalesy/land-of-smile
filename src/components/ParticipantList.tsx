@@ -35,7 +35,7 @@ export function ParticipantList({ participants, localUserId, localDisplayName, l
                 const connState = peerConnectionStates?.get(p.userId);
                 const isConnecting = connState !== undefined && connState !== "connected" && connState !== "closed";
                 return isConnecting ? (
-                  <span className="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--t-accent)] animate-spin" aria-hidden="true" />
+                  <span className="absolute inset-0 rounded-full border-[3px] border-transparent border-t-green-400 drop-shadow-[0_0_4px_#4ade80] animate-spin" aria-hidden="true" />
                 ) : null;
               })()}
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-500 text-white text-sm font-bold">
